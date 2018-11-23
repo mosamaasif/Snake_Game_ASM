@@ -73,7 +73,6 @@ drawBoundry:
 	mov dh, 0
 	mov ch, 0
 
-
 	mov [bp - 2], dx ; Row Y1 
 	mov [bp - 4], cx ; Col X1
 
@@ -169,6 +168,35 @@ drawPixel:
 
 	pop bp
 	ret 6
+
+
+;----------------------------
+	
+rand:
+	push bp
+	mov bp, sp 
+
+	push bx
+	push cx
+	push dx
+
+    mov ax, 0  
+	int 0x1A      
+
+	mov  ax, dx
+	mov  dx, 0
+ 	mov  cx, [bp + 4]    
+	div  cx 
+
+	mov ax, dx
+
+	pop dx
+	pop cx
+	pop bx 
+
+	pop bp
+	ret 2
+
 ;----------------------------
 
 drawSnake:
@@ -222,6 +250,9 @@ getPosition:
 	cmp ah, 0x48
 	jne __checkLeft
 
+	cmp word [DOWN], 1
+	je __skip
+
 	mov word [UP], 	  1
 	mov word [DOWN],  0
 	mov word [LEFT],  0
@@ -230,6 +261,9 @@ getPosition:
 __checkLeft:
 	cmp ah, 0x4B
 	jne __checkRight
+
+	cmp word [RIGHT], 1
+	je __skip
 
 	mov word [UP],    0
 	mov word [DOWN],  0
@@ -240,6 +274,9 @@ __checkRight:
 	cmp ah, 0x4D
 	jne __checkDown
 
+	cmp word [LEFT], 1
+	je __skip
+
 	mov word [UP],    0
 	mov word [DOWN],  0
 	mov word [LEFT],  0
@@ -248,6 +285,9 @@ __checkRight:
 __checkDown:
 	cmp ah, 0x50
 	jne __skip
+
+	cmp word [UP], 1
+	je __skip
 
 	mov word [UP],    0
 	mov word [DOWN],  1
@@ -291,6 +331,115 @@ _loopLeft:
 	pop bp
 	ret
 ;----------------------------
+	
+fruitUpdate:
+	push bp
+	mov bp, sp
+
+	push ax
+	push bx
+	push cx
+	push dx
+	push si
+
+	mov dx, [boundryX1Y1]
+	mov bx, [boundryX2Y2]
+
+	mov cx, [fruitPos]
+	mov ax, cx
+
+	mov cl, ch
+	mov ch, 0
+	mov ah, 0
+
+	push 0x0720
+	push cx
+	push ax
+	call drawPixel
+
+__findFruitPos:
+
+	mov cx, 0
+	mov cl, bh
+	sub cl, dh 
+	sub cl, 3 ; just to be sure fruit dont get outside the boundary
+
+	mov ax, 0
+	push cx ; row
+	call rand ; returns row between 0 to X2 - X1
+
+	add al, dh
+	add al, 3 ; just to be sure fruit dont get outside the boundary
+	mov si, ax
+
+	mov cl, bl
+	sub cl, dl
+	sub cl, 2 ; just to be sure fruit dont get outside the boundary
+
+	mov ax, 0
+
+	push cx
+	call rand
+
+	add al, dl
+	add al, 2 ; just to be sure fruit dont get outside the boundary
+	mov cx, si
+	mov ah, cl ; packs Row into AH and Col into AL
+
+	mov si, 0
+	mov cx, [snakeSize]
+
+__checkFruit:
+	cmp word [snake + si], ax
+	je __findFruitPos
+
+	add si, 2
+	dec cx
+	cmp cx, 0
+	jnz __checkFruit
+
+	mov bx, [boundryX1Y1]
+	mov cx, [boundryX2Y2]
+
+	mov [fruitPos], ax
+
+	pop si 
+	pop dx 
+	pop cx
+	pop bx 
+	pop ax
+
+	pop bp
+	ret
+
+;----------------------------
+
+drawFruit:
+	push bp
+	mov bp, sp 
+
+	push ax
+	push bx
+
+	mov ax, [fruitPos]
+
+	mov bx, 0
+	mov bl, ah
+	mov ah, 0
+
+	push 0x2020
+	push bx
+	push ax
+	call drawPixel
+
+	pop bx
+	pop ax
+
+	pop bp
+	ret
+
+;----------------------------
+
 checkCollision:
 	push bp
 	mov bp, sp
@@ -348,6 +497,21 @@ __collision:
 	cmp cx, 0
 	jnz __collision
 
+	mov ax, [snakeSize]	
+	mov bx, snake
+
+	dec ax
+	shl ax, 1
+	add bx, ax
+
+	mov ax, [fruitPos]
+
+	cmp ax, [bx] ; snake's head
+	jne __end
+
+	call fruitUpdate
+
+__end:
 	pop di
 	pop si
 	pop dx
@@ -423,6 +587,7 @@ __right:
 	add al, 1
 
 __doNothing:
+	
 	mov [bx], ax
 	
 	dec si
@@ -461,18 +626,22 @@ l1:
 	call clrscr
 	call drawBoundry
 	call drawSnake
+	call fruitUpdate
+	
+
+
 
 infinite:
-	
 	call update
 	call checkCollision
+	call drawFruit
 	call drawSnake
-	
 	
 
 	mov ah, 0x86
 	mov dx, 0xFFFF
 	int 0x15
+
 
 	jmp infinite
 exit:
@@ -486,8 +655,10 @@ snake:		times 240 dw 0 ; AH = Rows, AL = Columns
 snakeSize:	dw 20
 maxSize:	dw 240
 
-boundryX1Y1: dw 0x0201 ; AH = Row, AL = Columns
-boundryX2Y2: dw 0x174E ; AH = Row, AL = Columns
+boundryX1Y1: dw 0x0201 ; AH = Row, AL = Column
+boundryX2Y2: dw 0x174E ; AH = Row, AL = Column
+
+fruitPos: 	dw 0 ; AH = Row, AL = Column
 
 speed:		dw 1
 
