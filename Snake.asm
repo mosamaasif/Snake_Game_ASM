@@ -33,19 +33,21 @@ clrscr:
 	ret
 ;----------------------------
 
-getKey:
+getAsyncKey:
 	push bp
 	mov bp, sp
 
 	mov ah, 0x01                      
-	int   0x16                           
-	jz    __nodata                     
+	int 0x16                           
+	jz __nodata                     
 
 	mov ah, 0                
 	int 0x16
 	jmp __checkExit
+
 __nodata:
 	mov ax, 0
+
 __checkExit:
 	pop bp
 	ret
@@ -54,6 +56,7 @@ __checkExit:
 drawBoundry:
 	push bp
 	mov bp, sp
+	sub sp, 8
 
 	push ax
 	push bx
@@ -63,38 +66,63 @@ drawBoundry:
 	push di
 	push es
 
-	mov cx, 1
+	mov dx, [boundryX1Y1] ; DH = Row, DL = Column
+
+	mov cx, dx
+	mov dl, dh
+	mov dh, 0
+	mov ch, 0
+
+
+	mov [bp - 2], dx ; Row Y1 
+	mov [bp - 4], cx ; Col X1
+
+	mov dx, [boundryX2Y2] ; DH = Row, DL = Column
+
+	mov cx, dx
+	mov dl, dh
+	mov dh, 0
+	mov ch, 0
+
+	mov [bp - 6], dx ; Row Y2
+	mov [bp - 8], cx ; Col X2
+
+	mov cx, [bp - 4] ; Col X1
+	mov si, [bp - 2] ; Row Y1
+	mov di, [bp - 8] ; Col X2
+	mov ax, [bp - 6] ; Row Y2
 
 __loop:
 	push 0x3820
-	push 2
+	push si
 	push cx
-	call drawChar
+	call drawPixel
 
 	push 0x3820
-	push 23
+	push ax
 	push cx
-	call drawChar
+	call drawPixel
 
 	inc cx
-	cmp cx, 78
+	cmp cx, di
 	jnz __loop
 
-	mov cx, 2
-
+	mov cx, si
+	mov si, [bp - 4]
+	inc ax
 __loop1:
 	push 0x3820
 	push cx
-	push 1
-	call drawChar
+	push si
+	call drawPixel
 
 	push 0x3820
 	push cx
-	push 78
-	call drawChar
+	push di
+	call drawPixel
 
 	inc cx
-	cmp cx, 24
+	cmp cx, ax
 	jnz __loop1
 
 	pop es
@@ -105,11 +133,12 @@ __loop1:
 	pop bx
 	pop ax
 
+	mov sp, bp
 	pop bp
 	ret
 ;----------------------------
 
-drawChar:
+drawPixel:
 	push bp
 	mov bp, sp
 
@@ -121,11 +150,11 @@ drawChar:
 	mov ax, 0xb800
 	mov es, ax
 
-	mov ax, [bp + 6] ; col
+	mov ax, [bp + 6] ; row
 	mov bx, 160
 	mul bx
 
-	mov bx, [bp + 4] ; row
+	mov bx, [bp + 4] ; col
 	shl bx, 1
 	add ax, bx
 
@@ -165,7 +194,7 @@ __loop2:
 	push 0x6820
 	push dx
 	push ax
-	call drawChar
+	call drawPixel
 
 	add bx, 2
 
@@ -188,10 +217,7 @@ getPosition:
 
 	push ax
 
-	;mov ax, 0
-	;int 0x16
-
-	call getKey 
+	call getAsyncKey 
 
 	cmp ah, 0x48
 	jne __checkLeft
@@ -265,7 +291,72 @@ _loopLeft:
 	pop bp
 	ret
 ;----------------------------
+checkCollision:
+	push bp
+	mov bp, sp
 
+	push ax
+	push bx
+	push cx
+	push dx
+	push si
+	push di
+
+; checking collision with boundary
+
+	mov ax, [snakeSize]	
+	mov bx, snake
+
+	dec ax
+	shl ax, 1
+	add bx, ax
+
+	mov ax, [bx]
+	mov cx, [boundryX1Y1]
+	inc cl
+	inc ch
+
+	cmp al, cl
+	jb exit
+
+	cmp ah, ch
+	jb exit
+
+	mov cx, [boundryX2Y2]
+	dec cl
+	dec ch
+
+	cmp al, cl
+	ja exit
+
+	cmp ah, ch
+	ja exit
+
+; checking collision with snake's body
+
+	mov cx, [snakeSize]
+	mov bx, snake
+	dec cx
+	mov si, 0
+
+__collision:
+	cmp ax, [bx + si]
+	je exit
+
+	add si, 2
+	dec cx
+	cmp cx, 0
+	jnz __collision
+
+	pop di
+	pop si
+	pop dx
+	pop cx
+	pop bx
+	pop ax
+
+	pop bp
+	ret
 ;----------------------------
 ;	Game Functions
 
@@ -277,8 +368,12 @@ update:
 	push bx
 	push cx
 	push dx
+	push si
 
-	
+	mov si, [speed]
+
+__speedLoop:
+
 	mov bx, snake
 
 	mov dx, [bx]
@@ -291,7 +386,7 @@ update:
 	push 0x0720
 	push dx
 	push ax
-	call drawChar
+	call drawPixel
 
 	call moveLeft
 	call getPosition
@@ -307,29 +402,34 @@ update:
 	cmp word [UP], 1
 	jne __down
 
-	sub ah, [speed]
+	sub ah, 1
 
 __down:
 	cmp word [DOWN], 1
 	jne __left
 
-	add ah, [speed]
+	add ah, 1
 
 __left:
 	cmp word [LEFT], 1
 	jne __right
 
-	sub al, [speed]
+	sub al, 1
 
 __right:
 	cmp word [RIGHT], 1
 	jne __doNothing
 
-	add al, [speed]
+	add al, 1
 
 __doNothing:
 	mov [bx], ax
+	
+	dec si
+	cmp si, 0
+	jnz __speedLoop
 
+	pop si
 	pop dx
 	pop cx
 	pop bx
@@ -346,6 +446,8 @@ main:
 	mov cx, [snakeSize]
 	mov ah, 12
 	mov al, 28
+
+	mov word [RIGHT], 1
 l1:	
 	mov [bx], ax
 	inc al
@@ -361,30 +463,35 @@ l1:
 	call drawSnake
 
 infinite:
-
-	call drawSnake
+	
 	call update
+	call checkCollision
+	call drawSnake
+	
+	
 
 	mov ah, 0x86
-	mov cx, 1
+	mov dx, 0xFFFF
 	int 0x15
 
 	jmp infinite
-
-
-
+exit:
 	mov ax, 0x4c00
 	int 0x21
 
 ;----------------------------
 ;	Defines	
 
-snake:		times 256 dw 0 ; AH = Rows, AL = Columns
+snake:		times 240 dw 0 ; AH = Rows, AL = Columns
 snakeSize:	dw 20
+maxSize:	dw 240
+
+boundryX1Y1: dw 0x0201 ; AH = Row, AL = Columns
+boundryX2Y2: dw 0x174E ; AH = Row, AL = Columns
 
 speed:		dw 1
 
-UP:		dw 0
+UP:			dw 0
 DOWN:		dw 0
 LEFT:		dw 0
 RIGHT:		dw 0
