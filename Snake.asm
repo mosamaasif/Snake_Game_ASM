@@ -1,6 +1,58 @@
 [org 0x100]
 
 	jmp main
+;------------------------------
+;	BaoJi's stuff
+
+printnum:
+	push bp
+	mov bp, sp
+	push es
+	push ax
+	push bx
+	push cx
+	push dx
+	push di
+
+	mov ax, 0xb800
+	mov es, ax 
+	mov ax, [bp+4] 
+	mov bx, 10 
+	mov cx, 0 
+
+nextdigit:
+	mov dx, 0 
+	div bx 
+	add dl, 0x30 
+	push dx 
+	inc cx 
+	cmp ax, 0 
+	jnz nextdigit 
+	mov di, 0 
+
+nextpos:
+	pop dx
+	mov dh, 0x07 
+	mov [es:di], dx 
+	add di, 2 
+	loop nextpos
+
+	pop di
+	pop dx
+	pop cx
+	pop bx
+	pop ax
+	pop es
+	pop bp
+	ret 2
+
+
+
+
+
+
+
+
 
 ;-------------------------
 ;	Utility Functions
@@ -497,17 +549,19 @@ __collision:
 	cmp cx, 0
 	jnz __collision
 
+
 	mov ax, [snakeSize]	
 	mov bx, snake
 
 	dec ax
 	shl ax, 1
 	add bx, ax
-
 	mov ax, [fruitPos]
 
 	cmp ax, [bx] ; snake's head
 	jne __end
+
+	add word [interpolate], 4
 
 	call fruitUpdate
 
@@ -634,11 +688,36 @@ l1:
 infinite:
 	call update
 	call checkCollision
+
+	cmp word[interpolate], 0
+	je __noInterp
+
+	mov ax, [snakeSize]	
+	mov bx, snake
+
+	dec ax
+	shl ax, 1
+	add bx, ax
+
+
+
+	mov ax, [bx]
+	mov [bx + 2], ax
+	add word [snakeSize], 1
+	sub word [interpolate], 1
+
+__noInterp:
+
+	mov ax, [snakeSize]
+	push ax
+	call printnum
+
 	call drawFruit
 	call drawSnake
 	
 
 	mov ah, 0x86
+	mov cx, 1
 	mov dx, 0xFFFF
 	int 0x15
 
@@ -651,14 +730,12 @@ exit:
 ;----------------------------
 ;	Defines	
 
-snake:		times 240 dw 0 ; AH = Rows, AL = Columns
-snakeSize:	dw 20
-maxSize:	dw 240
-
 boundryX1Y1: dw 0x0201 ; AH = Row, AL = Column
 boundryX2Y2: dw 0x174E ; AH = Row, AL = Column
 
 fruitPos: 	dw 0 ; AH = Row, AL = Column
+
+interpolate: dw 0
 
 speed:		dw 1
 
@@ -666,3 +743,7 @@ UP:			dw 0
 DOWN:		dw 0
 LEFT:		dw 0
 RIGHT:		dw 0
+
+snakeSize:	dw 20
+maxSize:	dw 240
+snake:		times 240 dw 0 ; AH = Rows, AL = Columns
