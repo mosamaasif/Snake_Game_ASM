@@ -1,6 +1,7 @@
 [org 0x100]
 
 	jmp main
+
 ;------------------------------
 ;	BaoJi's stuff
 
@@ -83,6 +84,35 @@ clrscr:
 
 	pop bp
 	ret
+;----------------------------
+
+clock:
+	pusha
+
+	mov ax, [second]
+	push ax
+	call printnum
+
+
+	add word [milliSecond], 55
+	cmp word [milliSecond], 1000 ; one second
+	jb __endClock
+	
+	mov word [milliSecond], 0
+	add word [second], 1		
+
+	cmp word [second], 60 ; one minute
+	jb __endClock
+
+	mov word [second], 0
+	add word [minute], 1
+
+__endClock:
+
+
+	popa
+	iret
+
 ;----------------------------
 
 getAsyncKey:
@@ -220,6 +250,40 @@ drawPixel:
 
 	pop bp
 	ret 6
+
+;----------------------------
+
+getPixel:
+	push bp
+	mov bp, sp
+
+	push bx
+	push cx
+	push di
+	push es
+
+	mov cx, 0xb800
+	mov es, cx
+
+	mov cx, [bp + 6] ; row
+	mov bx, 160
+	mul bx
+
+	mov bx, [bp + 4] ; col
+	shl bx, 1
+	add cx, bx
+
+	mov di, cx
+	mov ax, [es:di]
+
+	pop es
+	pop di
+	pop cx
+	pop bx
+
+	pop bp
+	ret 4
+
 
 
 ;----------------------------
@@ -661,6 +725,20 @@ __doNothing:
 ;	Main Function
 
 main:
+	
+	push es
+	push 0
+	pop es
+
+	mov word [es:0x1C * 0x4], clock
+	mov word [es:0x1C * 0x4 + 0x2], cs 
+
+	pop es
+
+
+
+
+
 	mov bx, snake
 	mov cx, [snakeSize]
 	mov ah, 12
@@ -686,9 +764,7 @@ l1:
 
 
 infinite:
-	call update
-	call checkCollision
-
+	
 	cmp word[interpolate], 0
 	je __noInterp
 
@@ -699,19 +775,14 @@ infinite:
 	shl ax, 1
 	add bx, ax
 
-
-
 	mov ax, [bx]
 	mov [bx + 2], ax
 	add word [snakeSize], 1
 	sub word [interpolate], 1
-
 __noInterp:
 
-	mov ax, [snakeSize]
-	push ax
-	call printnum
-
+	call update
+	call checkCollision
 	call drawFruit
 	call drawSnake
 	
@@ -734,6 +805,10 @@ boundryX1Y1: dw 0x0201 ; AH = Row, AL = Column
 boundryX2Y2: dw 0x174E ; AH = Row, AL = Column
 
 fruitPos: 	dw 0 ; AH = Row, AL = Column
+
+milliSecond: dw 0
+second: dw 0
+minute: dw 0
 
 interpolate: dw 0
 
