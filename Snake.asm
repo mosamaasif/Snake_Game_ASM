@@ -3,6 +3,29 @@
 	jmp main
 
 ;------------------------------
+note:
+	push bp
+	mov bp, sp
+	pusha
+
+	mov byte[note_flag], 1
+
+	mov al, 182
+	out 43h, al
+	mov ax, [bp + 4]
+
+	out 42h, al
+	mov al, ah
+	out 42h, al
+	in al, 61h
+
+	or al, 3
+	out 61h, al
+
+	popa
+	pop bp
+	ret 2
+;------------------------------
 ;	BaoJi's stuff
 
 printnum:
@@ -97,21 +120,29 @@ clock:
 	add word [milliSecond], 55
 	cmp word [milliSecond], 1000 ; one second
 	jb __endClock
+
+	cmp byte[note_flag], 1
+	jne __cNext
+
+	mov byte[note_flag], 0
+	in al, 61h
+	and al, 11111100b
+	out 61h, al
 	
-	mov word [milliSecond], 0
-	add word [second], 1		
+	__cNext:
+		mov word [milliSecond], 0
+		add word [second], 1		
 
-	cmp word [second], 60 ; one minute
-	jb __endClock
+		cmp word [second], 60 ; one minute
+		jb __endClock
 
-	mov word [second], 0
-	add word [minute], 1
+		mov word [second], 0
+		add word [minute], 1
 
-__endClock:
+	__endClock:
 
-
-	popa
-	iret
+		popa
+		iret
 
 ;----------------------------
 
@@ -735,10 +766,6 @@ main:
 
 	pop es
 
-
-
-
-
 	mov bx, snake
 	mov cx, [snakeSize]
 	mov ah, 12
@@ -760,8 +787,11 @@ l1:
 	call drawSnake
 	call fruitUpdate
 	
-
-
+	push 1140	;another C, don't know piano shiz OK!
+	call note
+	__beginPause:
+		cmp byte[note_flag], 1
+		je __beginPause
 
 infinite:
 	
@@ -795,6 +825,12 @@ __noInterp:
 
 	jmp infinite
 exit:
+	push 4560	;middle C
+	call note
+	__deathLoop:
+		cmp byte[note_flag], 1
+		je __deathLoop
+
 	mov ax, 0x4c00
 	int 0x21
 
@@ -822,3 +858,5 @@ RIGHT:		dw 0
 snakeSize:	dw 20
 maxSize:	dw 240
 snake:		times 240 dw 0 ; AH = Rows, AL = Columns
+
+note_flag: db 0
