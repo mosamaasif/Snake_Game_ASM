@@ -8,8 +8,6 @@ note:
 	mov bp, sp
 	pusha
 
-	mov byte[note_flag], 1
-
 	mov al, 182
 	out 43h, al
 	mov ax, [bp + 4]
@@ -70,14 +68,6 @@ nextpos:
 	pop bp
 	ret 2
 
-
-
-
-
-
-
-
-
 ;-------------------------
 ;	Utility Functions
 
@@ -116,31 +106,37 @@ clock:
 	push ax
 	call printnum
 
-
-	add word [milliSecond], 55
-	cmp word [milliSecond], 1000 ; one second
-	jb __endClock
-
-	cmp byte[note_flag], 1
-	jne __cNext
+	mov al, [note_flag + 2]
+	cmp byte[note_flag + 1], al
+	jb __secCheck
 
 	mov byte[note_flag], 0
+	mov byte[note_flag + 1], 0
+	mov byte[note_flag + 2], 0
 	in al, 61h
 	and al, 11111100b
 	out 61h, al
-	
-	__cNext:
-		mov word [milliSecond], 0
-		add word [second], 1		
 
-		cmp word [second], 60 ; one minute
-		jb __endClock
+	__secCheck:
+		cmp byte[note_flag], 1
+		jne __nextC
+		inc byte[note_flag + 1]
 
-		mov word [second], 0
-		add word [minute], 1
+		__nextC:
+			add word [milliSecond], 55
+			cmp word [milliSecond], 1000 ; one second
+			jb __endClock
+
+	mov word [milliSecond], 0
+	add word [second], 1		
+
+	cmp word [second], 60 ; one minute
+	jb __endClock
+
+	mov word [second], 0
+	add word [minute], 1
 
 	__endClock:
-
 		popa
 		iret
 
@@ -509,19 +505,19 @@ __findFruitPos:
 	mov cx, 0
 	mov cl, bh
 	sub cl, dh 
-	sub cl, 3 ; just to be sure fruit dont get outside the boundary
+	sub cl, 3 ; just to be sure fruit doesn't get outside the boundary
 
 	mov ax, 0
 	push cx ; row
 	call rand ; returns row between 0 to X2 - X1
 
 	add al, dh
-	add al, 3 ; just to be sure fruit dont get outside the boundary
+	add al, 3 ; just to be sure fruit doesn't get outside the boundary
 	mov si, ax
 
 	mov cl, bl
 	sub cl, dl
-	sub cl, 2 ; just to be sure fruit dont get outside the boundary
+	sub cl, 2 ; just to be sure fruit doesn't get outside the boundary
 
 	mov ax, 0
 
@@ -529,7 +525,7 @@ __findFruitPos:
 	call rand
 
 	add al, dl
-	add al, 2 ; just to be sure fruit dont get outside the boundary
+	add al, 2 ; just to be sure fruit doesn't get outside the boundary
 	mov cx, si
 	mov ah, cl ; packs Row into AH and Col into AL
 
@@ -658,6 +654,12 @@ __collision:
 
 	add word [interpolate], 4
 
+	mov byte[note_flag], 1
+	mov byte[note_flag + 1], 0
+	mov byte[note_flag + 2], 6
+
+	push 4560	;middle C
+	call note
 	call fruitUpdate
 
 __end:
@@ -787,11 +789,24 @@ l1:
 	call drawSnake
 	call fruitUpdate
 	
-	push 1140	;another C, don't know piano shiz OK!
-	call note
-	__beginPause:
-		cmp byte[note_flag], 1
-		je __beginPause
+	push bx
+	mov bx, 3
+	__outerLoop:
+		mov byte[note_flag], 1
+		mov byte[note_flag + 1], 0
+		mov byte[note_flag + 2], 6
+
+		push 1140	;middle C
+		call note
+		__innerLoop:
+			cmp byte[note_flag], 1
+			je __innerLoop
+			mov ecx, 1000000000
+			__delay:
+				loop __delay
+			dec bx
+			jnz __outerLoop
+
 
 infinite:
 	
@@ -822,10 +837,13 @@ __noInterp:
 	mov dx, 0xFFFF
 	int 0x15
 
-
 	jmp infinite
 exit:
-	push 4560	;middle C
+	mov byte[note_flag], 1
+	mov byte[note_flag + 1], 0
+	mov byte[note_flag + 2], 4
+
+	push 9121	;middle C
 	call note
 	__deathLoop:
 		cmp byte[note_flag], 1
@@ -859,4 +877,4 @@ snakeSize:	dw 20
 maxSize:	dw 240
 snake:		times 240 dw 0 ; AH = Rows, AL = Columns
 
-note_flag: db 0
+note_flag: times 3 db 0
