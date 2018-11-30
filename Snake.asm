@@ -108,7 +108,6 @@ clock:
 	pusha
 
 	mov ax, [second]
-	;push ax
 
 	cmp byte[poison], 1
 	jne __rest1
@@ -303,6 +302,7 @@ __loop:
 	mov cx, si
 	mov si, [bp - 4]
 	inc ax
+
 __loop1:
 	push 0x3820
 	push cx
@@ -337,6 +337,7 @@ drawPixel:
 
 	push ax
 	push bx
+	push dx
 	push di
 	push es
 
@@ -357,6 +358,7 @@ drawPixel:
 
 	pop es
 	pop di
+	pop dx
 	pop bx
 	pop ax
 
@@ -371,6 +373,7 @@ getPixel:
 
 	push bx
 	push cx
+	push dx
 	push di
 	push es
 
@@ -390,13 +393,12 @@ getPixel:
 
 	pop es
 	pop di
+	pop dx
 	pop cx
 	pop bx
 
 	pop bp
 	ret 4
-
-
 
 ;----------------------------
 	
@@ -411,9 +413,17 @@ rand:
     mov ax, 0  
 	int 0x1A      
 
+	; using Xn+1 = (aXn + c) mod M
+
 	mov  ax, dx
 	mov  dx, 0
- 	mov  cx, [bp + 4]    
+
+	mov bx, 23
+	mul bx
+
+	add ax, dx
+	mov dx, 0
+ 	mov  cx, [bp + 4]
 	div  cx 
 
 	mov ax, dx
@@ -449,7 +459,7 @@ __loop2:
 	mov dl, dh
 	mov dh, 0
 
-	push 0x2023
+	push 0x6820
 	push dx
 	push ax
 	call drawPixel
@@ -467,19 +477,19 @@ __loop2:
 	mov dl, dh
 	mov dh, 0
 
-	push 0x402A
+	push 0x4020
 	push dx
 	push ax
 	call drawPixel
 
-	__endSnakeDraw:
-		pop dx
-		pop cx
-		pop bx
-		pop ax
+__endSnakeDraw:
+	pop dx
+	pop cx
+	pop bx
+	pop ax
 
-		pop bp
-		ret
+	pop bp
+	ret
 ;----------------------------
 
 getPosition:
@@ -585,6 +595,8 @@ fruitUpdate:
 	push dx
 	push si
 
+__findFruitPos: 
+
 	push 10
 	call rand
 
@@ -630,8 +642,6 @@ fruitUpdate:
 	push ax
 	call drawPixel
 
-__findFruitPos:
-
 	mov cx, 0
 	mov cl, bh
 	sub cl, dh 
@@ -671,10 +681,22 @@ __checkFruit:
 	cmp cx, 0
 	jnz __checkFruit
 
-	mov bx, [boundryX1Y1]
-	mov cx, [boundryX2Y2]
+	mov dx, ax
 
-	mov [fruitPos], ax
+	mov bx, 0
+	mov cx, 0
+
+	mov bl, ah
+	mov cl, al
+
+	push bx
+	push cx
+	call getPixel
+
+	cmp ax, 3820
+	je __findFruitPos
+
+	mov [fruitPos], dx
 
 	pop si 
 	pop dx 
@@ -996,10 +1018,11 @@ l1:
 	
 	call clrscr
 	call drawBoundry
-	call drawSnake
+	
 	call fruitUpdate
 	call updateStat
 	call printStatTags
+	call drawSnake
 	
 	push bx
 	mov bx, 3
@@ -1057,9 +1080,6 @@ exit:
 
 	push 9121	;middle C
 	call note
-	__deathLoop:
-		cmp byte[note_flag], 1
-		je __deathLoop
 
 	mov ax, 0x4c00
 	int 0x21
@@ -1088,12 +1108,12 @@ DOWN:		dw 0
 LEFT:		dw 0
 RIGHT:		dw 0
 
-snakeSize:	dw 20
-maxSize:	dw 240
-snake:		times 240 dw 0 ; AH = Rows, AL = Columns
-
 note_flag: times 3 db 0
 
 life:	db 3
 str1: 	db 'Health:', 0
 str2:	db 'Time:', 0
+
+snakeSize:	dw 20
+maxSize:	dw 240
+snake:		times 240 dw 0 ; AH = Rows, AL = Columns
