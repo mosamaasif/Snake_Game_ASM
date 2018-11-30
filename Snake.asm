@@ -3,7 +3,27 @@
 	jmp main
 
 ;------------------------------
-;	BaoJi's stuff
+note:
+	push bp
+	mov bp, sp
+	pusha
+
+	mov al, 182
+	out 43h, al
+	mov ax, [bp + 4]
+
+	out 42h, al
+	mov al, ah
+	out 42h, al
+	in al, 61h
+
+	or al, 3
+	out 61h, al
+
+	popa
+	pop bp
+	ret 2
+;------------------------------
 
 printnum:
 	push bp
@@ -16,8 +36,8 @@ printnum:
 	push di
 
 	mov ax, 0xb800
-	mov es, ax 
-	mov ax, [bp+4] 
+	mov es, ax
+	mov ax, [bp + 4]	;number 
 	mov bx, 10 
 	mov cx, 0 
 
@@ -29,7 +49,13 @@ nextdigit:
 	inc cx 
 	cmp ax, 0 
 	jnz nextdigit 
-	mov di, 0 
+	mov ax, [bp + 8]	;row
+	mov bx, 160
+	mul bx
+	mov dx, [bp + 6]	;col
+	shl dx, 1
+	add ax, dx
+	mov di, ax
 
 nextpos:
 	pop dx
@@ -45,15 +71,7 @@ nextpos:
 	pop ax
 	pop es
 	pop bp
-	ret 2
-
-
-
-
-
-
-
-
+	ret 6
 
 ;-------------------------
 ;	Utility Functions
@@ -90,14 +108,44 @@ clock:
 	pusha
 
 	mov ax, [second]
-	push ax
-	call printnum
+	;push ax
 
+	cmp byte[poison], 1
+	jne __rest1
 
-	add word [milliSecond], 55
-	cmp word [milliSecond], 1000 ; one second
-	jb __endClock
-	
+	cmp byte[poison + 1], 90
+	jb __rest
+
+	mov byte[poison], 0
+	mov byte[poison + 1], 0
+	call fruitUpdate
+	jmp __rest1
+
+	__rest:
+	inc byte[poison + 1]
+
+	__rest1:
+		mov al, [note_flag + 2]
+		cmp byte[note_flag + 1], al
+		jb __secCheck
+
+		mov byte[note_flag], 0
+		mov byte[note_flag + 1], 0
+		mov byte[note_flag + 2], 0
+		in al, 61h
+		and al, 0xFC
+		out 61h, al
+
+	__secCheck:
+		cmp byte[note_flag], 1
+		jne __nextC
+		inc byte[note_flag + 1]
+
+		__nextC:
+			add word [milliSecond], 55
+			cmp word [milliSecond], 1000 ; one second
+			jb __endClock
+
 	mov word [milliSecond], 0
 	add word [second], 1		
 
@@ -107,11 +155,9 @@ clock:
 	mov word [second], 0
 	add word [minute], 1
 
-__endClock:
-
-
-	popa
-	iret
+	__endClock:
+		popa
+		iret
 
 ;----------------------------
 
@@ -134,6 +180,72 @@ __checkExit:
 	pop bp
 	ret
 ;----------------------------
+
+printStatTags:
+	pusha
+	push es
+
+	push 0xB800
+	pop es
+
+	mov si, 280
+	mov di, 0
+	__pl1:
+		mov al, [str1 + di]
+		mov ah, 0x07
+		mov word[es:si], ax
+		add si, 2
+		inc di
+		cmp byte[str1 + di], 0
+		jne __pl1
+
+	mov si, 440
+	mov di, 0
+	__pl2:
+		mov al, [str2 + di]
+		mov ah, 0x07
+		mov word[es:si], ax
+		add si, 2
+		inc di
+		cmp byte[str2 + di], 0
+		jne __pl2
+
+	pop es
+	popa
+	ret
+
+updateStat:
+	pusha
+	push es
+
+	push 0xB800
+	pop es
+
+	mov cl, [life]
+	mov ch, 0
+	cmp cx, 0
+	je end
+
+	inc cx
+	mov si, 296
+	__ul1:
+		mov word[es:si], 0x0720
+		add si, 2
+		loop __ul1
+
+	mov cl, [life]
+	mov ch, 0
+
+	mov si, 296
+	__ul2:
+		mov word[es:si], 0x0403
+		add si, 2
+		loop __ul2
+
+	end:
+	pop es
+	popa
+	ret
 
 drawBoundry:
 	push bp
@@ -324,8 +436,10 @@ drawSnake:
 	push cx
 	push dx
 
-	mov cx, [snakeSize]
 	mov bx, snake
+	mov cx, [snakeSize]
+	dec cx
+	jz __endSnakeDraw
 
 __loop2:
 	mov dx, [bx]
@@ -335,7 +449,7 @@ __loop2:
 	mov dl, dh
 	mov dh, 0
 
-	push 0x6820
+	push 0x2023
 	push dx
 	push ax
 	call drawPixel
@@ -346,13 +460,26 @@ __loop2:
 	cmp cx, 0
 	jnz __loop2
 
-	pop dx
-	pop cx
-	pop bx
-	pop ax
+	mov dx, [bx]
+	mov ax, dx
 
-	pop bp
-	ret
+	mov ah, 0
+	mov dl, dh
+	mov dh, 0
+
+	push 0x402A
+	push dx
+	push ax
+	call drawPixel
+
+	__endSnakeDraw:
+		pop dx
+		pop cx
+		pop bx
+		pop ax
+
+		pop bp
+		ret
 ;----------------------------
 
 getPosition:
@@ -458,6 +585,36 @@ fruitUpdate:
 	push dx
 	push si
 
+	push 10
+	call rand
+
+	cmp ax, 3
+	jne __nextComp
+
+	mov byte[poison], 1
+	mov byte[poison + 1], 0
+	jmp __upd
+
+	__nextComp:
+		cmp ax, 5
+		jne __nextComp1
+
+		mov byte[poison], 1
+		mov byte[poison + 1], 0
+		jmp __upd
+
+	__nextComp1:
+		cmp ax, 8
+		jne __upd
+
+		mov byte[poison], 1
+		mov byte[poison + 1], 0
+	
+	__upd:
+	mov dx, ax
+	shl dx, 1
+	mov byte[fruitType], dl
+
 	mov dx, [boundryX1Y1]
 	mov bx, [boundryX2Y2]
 
@@ -478,19 +635,19 @@ __findFruitPos:
 	mov cx, 0
 	mov cl, bh
 	sub cl, dh 
-	sub cl, 3 ; just to be sure fruit dont get outside the boundary
+	sub cl, 3 ; just to be sure fruit doesn't get outside the boundary
 
 	mov ax, 0
 	push cx ; row
 	call rand ; returns row between 0 to X2 - X1
 
 	add al, dh
-	add al, 3 ; just to be sure fruit dont get outside the boundary
+	add al, 3 ; just to be sure fruit doesn't get outside the boundary
 	mov si, ax
 
 	mov cl, bl
 	sub cl, dl
-	sub cl, 2 ; just to be sure fruit dont get outside the boundary
+	sub cl, 2 ; just to be sure fruit doesn't get outside the boundary
 
 	mov ax, 0
 
@@ -498,7 +655,7 @@ __findFruitPos:
 	call rand
 
 	add al, dl
-	add al, 2 ; just to be sure fruit dont get outside the boundary
+	add al, 2 ; just to be sure fruit doesn't get outside the boundary
 	mov cx, si
 	mov ah, cl ; packs Row into AH and Col into AL
 
@@ -536,6 +693,11 @@ drawFruit:
 
 	push ax
 	push bx
+	push si
+
+	mov bl, [fruitType]
+	mov bh, 0
+	push word[fruitArr + bx]
 
 	mov ax, [fruitPos]
 
@@ -543,11 +705,11 @@ drawFruit:
 	mov bl, ah
 	mov ah, 0
 
-	push 0x2020
 	push bx
 	push ax
 	call drawPixel
 
+	pop si
 	pop bx
 	pop ax
 
@@ -582,23 +744,70 @@ checkCollision:
 	inc ch
 
 	cmp al, cl
-	jb exit
+	jae __nxtC
 
+	dec byte[life]
+	call updateStat
+
+	mov byte[note_flag], 1
+	mov byte[note_flag + 1], 0
+	mov byte[note_flag + 2], 4
+
+	push 9121	;middle C
+	call note
+	jmp __end
+
+	__nxtC:
 	cmp ah, ch
-	jb exit
+	jae __nxtC1
 
+	dec byte[life]
+	call updateStat
+
+	mov byte[note_flag], 1
+	mov byte[note_flag + 1], 0
+	mov byte[note_flag + 2], 4
+
+	push 9121	;middle C
+	call note
+	jmp __end
+
+	__nxtC1:
 	mov cx, [boundryX2Y2]
 	dec cl
 	dec ch
 
 	cmp al, cl
-	ja exit
+	jbe __nxtC2
 
+	dec byte[life]
+	call updateStat
+
+	mov byte[note_flag], 1
+	mov byte[note_flag + 1], 0
+	mov byte[note_flag + 2], 4
+
+	push 9121	;middle C
+	call note
+	jmp __end
+
+	__nxtC2:
 	cmp ah, ch
-	ja exit
+	jbe __nxtC3
+
+	dec byte[life]
+	call updateStat
+
+	mov byte[note_flag], 1
+	mov byte[note_flag + 1], 0
+	mov byte[note_flag + 2], 4
+
+	push 9121	;middle C
+	call note
+	jmp __end
 
 ; checking collision with snake's body
-
+	__nxtC3:
 	mov cx, [snakeSize]
 	mov bx, snake
 	dec cx
@@ -606,8 +815,20 @@ checkCollision:
 
 __collision:
 	cmp ax, [bx + si]
-	je exit
+	jne __colS
 
+	dec byte[life]
+	call updateStat
+
+	mov byte[note_flag], 1
+	mov byte[note_flag + 1], 0
+	mov byte[note_flag + 2], 4
+
+	push 9121	;middle C
+	call note
+	jmp __end
+
+	__colS:
 	add si, 2
 	dec cx
 	cmp cx, 0
@@ -625,11 +846,36 @@ __collision:
 	cmp ax, [bx] ; snake's head
 	jne __end
 
+	cmp byte[poison], 1
+	jne __skipC
+
+	mov word[poison], 0
+	dec byte[life]
+	call updateStat
+
+	mov byte[note_flag], 1
+	mov byte[note_flag + 1], 0
+	mov byte[note_flag + 2], 4
+
+	push 9121	;middle C
+	call note
+	jmp __end
+
+	__skipC:
 	add word [interpolate], 4
 
+	mov byte[note_flag], 1
+	mov byte[note_flag + 1], 0
+	mov byte[note_flag + 2], 6
+
+	push 4560	;middle C
+	call note
 	call fruitUpdate
 
 __end:
+	cmp byte[life], 0
+	je exit
+
 	pop di
 	pop si
 	pop dx
@@ -726,18 +972,11 @@ __doNothing:
 
 main:
 	
-	push es
 	push 0
 	pop es
 
 	mov word [es:0x1C * 0x4], clock
-	mov word [es:0x1C * 0x4 + 0x2], cs 
-
-	pop es
-
-
-
-
+	mov word [es:0x1C * 0x4 + 0x2], cs
 
 	mov bx, snake
 	mov cx, [snakeSize]
@@ -759,8 +998,26 @@ l1:
 	call drawBoundry
 	call drawSnake
 	call fruitUpdate
+	call updateStat
+	call printStatTags
 	
+	push bx
+	mov bx, 3
+	__outerLoop:
+		mov byte[note_flag], 1
+		mov byte[note_flag + 1], 0
+		mov byte[note_flag + 2], 6
 
+		push 1140	;middle C
+		call note
+		__innerLoop:
+			cmp byte[note_flag], 1
+			je __innerLoop
+			mov ecx, 1000000000
+			__delay:
+				loop __delay
+			dec bx
+			jnz __outerLoop
 
 
 infinite:
@@ -792,19 +1049,31 @@ __noInterp:
 	mov dx, 0xFFFF
 	int 0x15
 
-
 	jmp infinite
 exit:
+	mov byte[note_flag], 1
+	mov byte[note_flag + 1], 0
+	mov byte[note_flag + 2], 4
+
+	push 9121	;middle C
+	call note
+	__deathLoop:
+		cmp byte[note_flag], 1
+		je __deathLoop
+
 	mov ax, 0x4c00
 	int 0x21
 
 ;----------------------------
 ;	Defines	
 
-boundryX1Y1: dw 0x0201 ; AH = Row, AL = Column
-boundryX2Y2: dw 0x174E ; AH = Row, AL = Column
+boundryX1Y1: dw 0x0400 ; H = Row, L = Column
+boundryX2Y2: dw 0x184F ; H = Row, L = Column
 
 fruitPos: 	dw 0 ; AH = Row, AL = Column
+fruitArr:	dw 0x010F, 0x0514, 0x0315, 0x8824, 0x0E25, 0x8D0E, 0x0606, 0x0613, 0x831E, 0x0417 
+fruitType:	db 0
+poison:		dw 0
 
 milliSecond: dw 0
 second: dw 0
@@ -822,3 +1091,9 @@ RIGHT:		dw 0
 snakeSize:	dw 20
 maxSize:	dw 240
 snake:		times 240 dw 0 ; AH = Rows, AL = Columns
+
+note_flag: times 3 db 0
+
+life:	db 3
+str1: 	db 'Health:', 0
+str2:	db 'Time:', 0
