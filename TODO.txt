@@ -5,9 +5,11 @@
 	TODO
 =========================================
 
-1: Add Lives
-2: Add Time and Snake's Speed
-3: Fix resest when health is lowered
-4: Display time and win/loose checks
-5: Add comments
-6: Stages/Levels (rest of the bonus is done)
+1: Add time and snake's speed.
+2: Display time and win/loose checks.
+3: Add comments.
+4: Stages/Levels (rest of the bonus is done).
+5: Fix weird bug(Game stucks) after poisonous fruit disappear.
+6: Add score.
+7: Game's startup screen.
+8: Game's end screen. 

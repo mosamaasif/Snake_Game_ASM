@@ -459,7 +459,7 @@ __loop2:
 	mov dl, dh
 	mov dh, 0
 
-	push 0x6820
+	push 0x682A
 	push dx
 	push ax
 	call drawPixel
@@ -477,7 +477,7 @@ __loop2:
 	mov dl, dh
 	mov dh, 0
 
-	push 0x4020
+	push 0x4040
 	push dx
 	push ax
 	call drawPixel
@@ -777,6 +777,7 @@ checkCollision:
 
 	push 9121	;middle C
 	call note
+	call resetGame
 	jmp __end
 
 	__nxtC:
@@ -792,6 +793,7 @@ checkCollision:
 
 	push 9121	;middle C
 	call note
+	call resetGame
 	jmp __end
 
 	__nxtC1:
@@ -811,6 +813,7 @@ checkCollision:
 
 	push 9121	;middle C
 	call note
+	call resetGame
 	jmp __end
 
 	__nxtC2:
@@ -826,6 +829,7 @@ checkCollision:
 
 	push 9121	;middle C
 	call note
+	call resetGame
 	jmp __end
 
 ; checking collision with snake's body
@@ -848,6 +852,7 @@ __collision:
 
 	push 9121	;middle C
 	call note
+	call resetGame
 	jmp __end
 
 	__colS:
@@ -881,6 +886,8 @@ __collision:
 
 	push 9121	;middle C
 	call note
+	call resetGame
+
 	jmp __end
 
 	__skipC:
@@ -907,8 +914,115 @@ __end:
 
 	pop bp
 	ret
+
+;---------------------------
+
+interpolateSnake:
+	pusha
+
+	cmp word [interpInterval], 10 ; after 10 frames snake's size increases by 1, making the snake grow smoothly
+	jne __noInterp
+
+	mov word [interpInterval], 0
+
+	cmp word [interpolate], 0
+	je __noInterp
+
+	mov ax, [snakeSize]	
+	mov bx, snake
+
+	dec ax
+	shl ax, 1
+	add bx, ax
+
+	mov ax, [bx]
+	mov [bx + 2], ax
+	add word [snakeSize], 1
+	sub word [interpolate], 1
+__noInterp:
+	
+	add word [interpInterval], 1
+
+	popa
+	ret
 ;----------------------------
 ;	Game Functions
+
+resetGame:
+	pusha
+
+	mov word [snakeSize], 20
+
+	mov bx, snake
+	mov cx, [snakeSize]
+	mov ah, 12
+	mov al, 28
+
+	mov word [UP], 	  0
+	mov word [DOWN],  0
+	mov word [LEFT],  0
+	mov word [RIGHT], 1
+	
+l1:	
+	mov [bx], ax
+	inc al
+
+	add bx, 2
+
+	dec cx
+	cmp cx, 0
+	jnz l1
+	
+	call clrscr
+
+	call drawBoundry
+	call fruitUpdate
+
+	call updateStat
+	call printStatTags
+
+	call drawSnake
+	
+	popa
+	ret
+
+;----------------------------
+
+startSound:               ; idk what to name this lol
+	pusha
+
+	mov bx, 3
+
+__outerLoop:
+	mov byte[note_flag], 1
+	mov byte[note_flag + 1], 0
+	mov byte[note_flag + 2], 6
+
+	push 1140	;middle C
+	call note
+	__innerLoop:
+		cmp byte[note_flag], 1
+		je __innerLoop
+
+		push cx
+		push dx
+
+		mov ah, 0x86
+		mov cx, 2
+		mov dx, 0
+		int 0x15
+
+		pop dx
+		pop cx
+
+		dec bx
+		jnz __outerLoop
+
+	popa
+	ret
+
+;----------------------------
+
 
 update:
 	push bp
@@ -919,10 +1033,6 @@ update:
 	push cx
 	push dx
 	push si
-
-	mov si, [speed]
-
-__speedLoop:
 
 	mov bx, snake
 
@@ -975,10 +1085,6 @@ __right:
 __doNothing:
 	
 	mov [bx], ax
-	
-	dec si
-	cmp si, 0
-	jnz __speedLoop
 
 	pop si
 	pop dx
@@ -1000,67 +1106,13 @@ main:
 	mov word [es:0x1C * 0x4], clock
 	mov word [es:0x1C * 0x4 + 0x2], cs
 
-	mov bx, snake
-	mov cx, [snakeSize]
-	mov ah, 12
-	mov al, 28
-
-	mov word [RIGHT], 1
-l1:	
-	mov [bx], ax
-	inc al
-
-	add bx, 2
-
-	dec cx
-	cmp cx, 0
-	jnz l1
-	
-	call clrscr
-	call drawBoundry
-	
-	call fruitUpdate
-	call updateStat
-	call printStatTags
-	call drawSnake
-	
-	push bx
-	mov bx, 3
-	__outerLoop:
-		mov byte[note_flag], 1
-		mov byte[note_flag + 1], 0
-		mov byte[note_flag + 2], 6
-
-		push 1140	;middle C
-		call note
-		__innerLoop:
-			cmp byte[note_flag], 1
-			je __innerLoop
-			mov ecx, 1000000000
-			__delay:
-				loop __delay
-			dec bx
-			jnz __outerLoop
+	call resetGame
+	call startSound
 
 
 infinite:
-	
-	cmp word[interpolate], 0
-	je __noInterp
 
-	mov ax, [snakeSize]	
-	mov bx, snake
-
-	dec ax
-	shl ax, 1
-	add bx, ax
-
-	mov ax, [bx]
-	mov [bx + 2], ax
-	add word [snakeSize], 1
-	sub word [interpolate], 1
-__noInterp:
-
+	call interpolateSnake
 	call update
 	call checkCollision
 	call drawFruit
@@ -1073,6 +1125,7 @@ __noInterp:
 	int 0x15
 
 	jmp infinite
+
 exit:
 	mov byte[note_flag], 1
 	mov byte[note_flag + 1], 0
@@ -1087,33 +1140,45 @@ exit:
 ;----------------------------
 ;	Defines	
 
-boundryX1Y1: dw 0x0400 ; H = Row, L = Column
-boundryX2Y2: dw 0x184F ; H = Row, L = Column
+boundryX1Y1: 		dw 0x0400 ; H = Row, L = Column
+boundryX2Y2: 		dw 0x184F ; H = Row, L = Column
 
-fruitPos: 	dw 0 ; AH = Row, AL = Column
-fruitArr:	dw 0x010F, 0x0514, 0x0315, 0x8824, 0x0E25, 0x8D0E, 0x0606, 0x0613, 0x831E, 0x0417 
-fruitType:	db 0
-poison:		dw 0
+fruitPos: 			dw 0 ; H = Row, L = Column
+fruitArr:			dw 0x010F, 0x0514, 0x0315, 0x8824, 0x0E25, 0x8D0E, 0x0606, 0x0613, 0x831E, 0x0417 
+fruitType:			db 0
+poison:				dw 0
 
-milliSecond: dw 0
-second: dw 0
-minute: dw 0
+milliSecond: 		dw 0
+second: 			dw 0
+minute: 			dw 0
 
-interpolate: dw 0
+interpolate: 		dw 0
+interpInterval: 	dw 0
 
-speed:		dw 1
+speed:				dw 1
 
-UP:			dw 0
-DOWN:		dw 0
-LEFT:		dw 0
-RIGHT:		dw 0
+UP:					dw 0
+DOWN:				dw 0
+LEFT:				dw 0
+RIGHT:				dw 0
 
-note_flag: times 3 db 0
+note_flag: times 3 	db 0
 
-life:	db 3
-str1: 	db 'Health:', 0
-str2:	db 'Time:', 0
+life:				db 3
+str1: 				db 'Health:', 0
+str2:				db 'Time:', 0
 
-snakeSize:	dw 20
-maxSize:	dw 240
-snake:		times 240 dw 0 ; AH = Rows, AL = Columns
+snakeSize:			dw 20
+maxSize:			dw 240
+snake:				times 240 dw 0 ; AH = Rows, AL = Columns
+
+
+
+
+
+
+
+
+
+
+
