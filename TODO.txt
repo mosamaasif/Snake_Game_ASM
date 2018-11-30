@@ -5,5 +5,9 @@
 	TODO
 =========================================
 
-1: Add Lives and Score
+1: Add Lives
 2: Add Time and Snake's Speed
+3: Fix resest when health is lowered
+4: Display time and win/loose checks
+5: Add comments
+6: Stages/Levels (rest of the bonus is done)
