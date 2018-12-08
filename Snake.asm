@@ -1106,6 +1106,42 @@ resetGame:
 ;////////////////////////////////////////////
 
 ;////////////////////////////////////////////
+
+speedControl:
+	pusha
+
+	mov ax, [second]
+
+	cmp ax, 0
+	je __noIncrease
+
+	mov dx, 0
+	mov bx, 20
+	div bx
+
+	cmp dx, 0
+	jne __noIncrease
+
+	mov ax, [speed + 2]
+	cmp ax, 0x00FE
+	jbe __noIncrease
+
+	sub ah, 0x11
+	mov [speed + 2], ax
+
+	__noIncrease:
+	mov ax, 0
+	mov cx, [speed]
+	mov dx, [speed + 2]
+	mov ah, 0x86
+	int 0x15
+
+	popa
+	ret
+;////////////////////////////////////////////
+
+;///////////////////////////////////////////
+
 startSound:               ; idk what to name this lol
 	pusha
 
@@ -1224,9 +1260,11 @@ main:
 	mov word [es:0x1C * 0x4], clock
 	mov word [es:0x1C * 0x4 + 0x2], cs
 
+	mov word [speed], 0x0001
+	mov word [speed +  2], 0xFFFE
+
 	call resetGame
 	call startSound
-
 
 	infinite:
 
@@ -1237,10 +1275,7 @@ main:
 		call drawSnake
 
 
-		mov ah, 0x86
-		mov cx, 1
-		mov dx, 0xFFFF
-		int 0x15
+		call speedControl
 
 		jmp infinite
 
@@ -1251,10 +1286,6 @@ main:
 
 		push 9121	;middle C
 		call note
-
-		deathloop:
-			cmp byte[note_flag], 0
-			jne deathloop
 
 		mov ax, 0x4c00
 		int 0x21
@@ -1275,10 +1306,11 @@ milliSecond: 		dw 0
 second: 			dw 0
 minute: 			dw 0
 
+
+speed:				dd 0
+
 interpolate: 		dw 0
 interpInterval: 	dw 0
-
-speed:				dw 1
 
 UP:					dw 0
 DOWN:				dw 0
