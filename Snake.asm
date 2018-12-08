@@ -2,7 +2,7 @@
 
 	jmp main
 
-;------------------------------
+;////////////////////////////////////////////
 note:
 	push bp
 	mov bp, sp
@@ -23,8 +23,9 @@ note:
 	popa
 	pop bp
 	ret 2
-;------------------------------
+;////////////////////////////////////////////
 
+;////////////////////////////////////////////
 printnum:
 	push bp
 	mov bp, sp
@@ -41,28 +42,28 @@ printnum:
 	mov bx, 10 
 	mov cx, 0 
 
-nextdigit:
-	mov dx, 0 
-	div bx 
-	add dl, 0x30 
-	push dx 
-	inc cx 
-	cmp ax, 0 
-	jnz nextdigit 
-	mov ax, [bp + 8]	;row
-	mov bx, 160
-	mul bx
-	mov dx, [bp + 6]	;col
-	shl dx, 1
-	add ax, dx
-	mov di, ax
+	nextdigit:
+		mov dx, 0 
+		div bx 
+		add dl, 0x30 
+		push dx 
+		inc cx 
+		cmp ax, 0 
+		jnz nextdigit 
+		mov ax, [bp + 8]	;row
+		mov bx, 160
+		mul bx
+		mov dx, [bp + 6]	;col
+		shl dx, 1
+		add ax, dx
+		mov di, ax
 
-nextpos:
-	pop dx
-	mov dh, 0x07 
-	mov [es:di], dx 
-	add di, 2 
-	loop nextpos
+	nextpos:
+		pop dx
+		mov dh, 0x07 
+		mov [es:di], dx 
+		add di, 2 
+		loop nextpos
 
 	pop di
 	pop dx
@@ -72,8 +73,82 @@ nextpos:
 	pop es
 	pop bp
 	ret 6
+;////////////////////////////////////////////
 
-;-------------------------
+time_upd:
+	pusha
+	push es
+
+	cmp byte[curr_time], 0
+	je __tnext
+
+	cmp word[curr_time + 1], 0
+	je __tskip
+
+	__tupd:
+		dec word[curr_time + 1]
+
+		push 0xB800
+		pop es
+
+		mov word[es:294], 0x0720
+		mov word[es:296], 0x073A
+		mov word[es:298], 0x0720
+		mov word[es:300], 0x0720
+	
+		push 1
+		push 67
+		mov ah, 0
+		mov al, [curr_time]
+		push ax
+		call printnum
+
+		cmp word[curr_time + 1], 10
+		jb _tupd1
+		
+		push 1
+		push 69
+		push word[curr_time + 1]
+		call printnum
+		jmp __tend
+
+		_tupd1:
+			mov word[es:298], 0x0730
+			push 1
+			push 70
+			push word[curr_time + 1]
+			call printnum
+			jmp __tend
+
+	__tskip:
+		mov word[curr_time + 1], 60
+		dec byte[curr_time]
+		jmp __tupd
+
+	__tnext:
+		cmp word[curr_time + 1], 0
+		jne __tupd
+
+		mov byte[curr_time], 1
+		mov word[curr_time + 1], 0
+		dec byte[life]
+		cmp byte[life], 0
+		je __tend
+		call updateStat
+
+		mov byte[note_flag], 1
+		mov byte[note_flag + 1], 0
+		mov byte[note_flag + 2], 4
+
+		push 9121	;middle C
+		call note
+		call resetGame
+
+	__tend:
+		pop es
+		popa
+		ret
+;////////////////////////////////////////////
 ;	Utility Functions
 
 clrscr:
@@ -102,8 +177,9 @@ clrscr:
 
 	pop bp
 	ret
-;----------------------------
+;////////////////////////////////////////////
 
+;////////////////////////////////////////////
 clock:
 	pusha
 
@@ -121,7 +197,7 @@ clock:
 	jmp __rest1
 
 	__rest:
-	inc byte[poison + 1]
+		inc byte[poison + 1]
 
 	__rest1:
 		mov al, [note_flag + 2]
@@ -145,6 +221,9 @@ clock:
 			cmp word [milliSecond], 1000 ; one second
 			jb __endClock
 
+	call time_upd
+	cmp byte [life], 0
+	je __endClock
 	mov word [milliSecond], 0
 	add word [second], 1		
 
@@ -156,10 +235,18 @@ clock:
 
 	__endClock:
 		popa
+		cmp byte [life], 0
+		je __final
 		iret
 
-;----------------------------
+	__final:
+		pop ax
+		mov ax, exit
+		push exit
+		iret
+;////////////////////////////////////////////
 
+;////////////////////////////////////////////
 getAsyncKey:
 	push bp
 	mov bp, sp
@@ -172,14 +259,15 @@ getAsyncKey:
 	int 0x16
 	jmp __checkExit
 
-__nodata:
-	mov ax, 0
+	__nodata:
+		mov ax, 0
 
-__checkExit:
-	pop bp
-	ret
-;----------------------------
+	__checkExit:
+		pop bp
+		ret
+;////////////////////////////////////////////
 
+;////////////////////////////////////////////
 printStatTags:
 	pusha
 	push es
@@ -187,7 +275,7 @@ printStatTags:
 	push 0xB800
 	pop es
 
-	mov si, 280
+	mov si, 120
 	mov di, 0
 	__pl1:
 		mov al, [str1 + di]
@@ -198,7 +286,7 @@ printStatTags:
 		cmp byte[str1 + di], 0
 		jne __pl1
 
-	mov si, 440
+	mov si, 280
 	mov di, 0
 	__pl2:
 		mov al, [str2 + di]
@@ -209,10 +297,23 @@ printStatTags:
 		cmp byte[str2 + di], 0
 		jne __pl2
 
+	mov si, 440
+	mov di, 0
+	__pl3:
+		mov al, [str3 + di]
+		mov ah, 0x07
+		mov word[es:si], ax
+		add si, 2
+		inc di
+		cmp byte[str3 + di], 0
+		jne __pl3
+
 	pop es
 	popa
 	ret
+;////////////////////////////////////////////
 
+;////////////////////////////////////////////
 updateStat:
 	pusha
 	push es
@@ -226,7 +327,7 @@ updateStat:
 	je end
 
 	inc cx
-	mov si, 296
+	mov si, 136
 	__ul1:
 		mov word[es:si], 0x0720
 		add si, 2
@@ -235,17 +336,26 @@ updateStat:
 	mov cl, [life]
 	mov ch, 0
 
-	mov si, 296
+	mov si, 136
 	__ul2:
 		mov word[es:si], 0x0403
 		add si, 2
 		loop __ul2
 
+	push 2	;row
+	push 67	;col
+	mov al, [cs:score]
+	mov ah, 0
+	push ax
+	call printnum
+
 	end:
 	pop es
 	popa
 	ret
+;////////////////////////////////////////////
 
+;////////////////////////////////////////////
 drawBoundry:
 	push bp
 	mov bp, sp
@@ -284,39 +394,39 @@ drawBoundry:
 	mov di, [bp - 8] ; Col X2
 	mov ax, [bp - 6] ; Row Y2
 
-__loop:
-	push 0x3820
-	push si
-	push cx
-	call drawPixel
+	__loop:
+		push 0x3820
+		push si
+		push cx
+		call drawPixel
 
-	push 0x3820
-	push ax
-	push cx
-	call drawPixel
+		push 0x3820
+		push ax
+		push cx
+		call drawPixel
 
-	inc cx
-	cmp cx, di
-	jnz __loop
+		inc cx
+		cmp cx, di
+		jnz __loop
 
-	mov cx, si
-	mov si, [bp - 4]
-	inc ax
+		mov cx, si
+		mov si, [bp - 4]
+		inc ax
 
-__loop1:
-	push 0x3820
-	push cx
-	push si
-	call drawPixel
+	__loop1:
+		push 0x3820
+		push cx
+		push si
+		call drawPixel
 
-	push 0x3820
-	push cx
-	push di
-	call drawPixel
+		push 0x3820
+		push cx
+		push di
+		call drawPixel
 
-	inc cx
-	cmp cx, ax
-	jnz __loop1
+		inc cx
+		cmp cx, ax
+		jnz __loop1
 
 	pop es
 	pop di
@@ -329,8 +439,9 @@ __loop1:
 	mov sp, bp
 	pop bp
 	ret
-;----------------------------
+;////////////////////////////////////////////
 
+;////////////////////////////////////////////
 drawPixel:
 	push bp
 	mov bp, sp
@@ -364,9 +475,9 @@ drawPixel:
 
 	pop bp
 	ret 6
+;////////////////////////////////////////////
 
-;----------------------------
-
+;////////////////////////////////////////////
 getPixel:
 	push bp
 	mov bp, sp
@@ -399,9 +510,9 @@ getPixel:
 
 	pop bp
 	ret 4
+;////////////////////////////////////////////
 
-;----------------------------
-	
+;////////////////////////////////////////////	
 rand:
 	push bp
 	mov bp, sp 
@@ -434,9 +545,9 @@ rand:
 
 	pop bp
 	ret 2
+;////////////////////////////////////////////
 
-;----------------------------
-
+;////////////////////////////////////////////
 drawSnake:
 	push bp
 	mov bp, sp
@@ -451,47 +562,48 @@ drawSnake:
 	dec cx
 	jz __endSnakeDraw
 
-__loop2:
-	mov dx, [bx]
-	mov ax, dx
+	__loop2:
+		mov dx, [bx]
+		mov ax, dx
 
-	mov ah, 0
-	mov dl, dh
-	mov dh, 0
+		mov ah, 0
+		mov dl, dh
+		mov dh, 0
 
-	push 0x682A
-	push dx
-	push ax
-	call drawPixel
+		push 0x682A
+		push dx
+		push ax
+		call drawPixel
 
-	add bx, 2
+		add bx, 2
 
-	dec cx
-	cmp cx, 0
-	jnz __loop2
+		dec cx
+		cmp cx, 0
+		jnz __loop2
 
-	mov dx, [bx]
-	mov ax, dx
+		mov dx, [bx]
+		mov ax, dx
 
-	mov ah, 0
-	mov dl, dh
-	mov dh, 0
+		mov ah, 0
+		mov dl, dh
+		mov dh, 0
 
-	push 0x4040
-	push dx
-	push ax
-	call drawPixel
+		push 0x4040
+		push dx
+		push ax
+		call drawPixel
 
-__endSnakeDraw:
-	pop dx
-	pop cx
-	pop bx
-	pop ax
+	__endSnakeDraw:
+		pop dx
+		pop cx
+		pop bx
+		pop ax
 
-	pop bp
-	ret
-;----------------------------
+		pop bp
+		ret
+;////////////////////////////////////////////
 
+;////////////////////////////////////////////
 getPosition:
 	push bp
 	mov bp, sp
@@ -511,50 +623,51 @@ getPosition:
 	mov word [LEFT],  0
 	mov word [RIGHT], 0
 
-__checkLeft:
-	cmp ah, 0x4B
-	jne __checkRight
+	__checkLeft:
+		cmp ah, 0x4B
+		jne __checkRight
 
-	cmp word [RIGHT], 1
-	je __skip
+		cmp word [RIGHT], 1
+		je __skip
 
-	mov word [UP],    0
-	mov word [DOWN],  0
-	mov word [LEFT],  1
-	mov word [RIGHT], 0
+		mov word [UP],    0
+		mov word [DOWN],  0
+		mov word [LEFT],  1
+		mov word [RIGHT], 0
 
-__checkRight:
-	cmp ah, 0x4D
-	jne __checkDown
+	__checkRight:
+		cmp ah, 0x4D
+		jne __checkDown
 
-	cmp word [LEFT], 1
-	je __skip
+		cmp word [LEFT], 1
+		je __skip
 
-	mov word [UP],    0
-	mov word [DOWN],  0
-	mov word [LEFT],  0
-	mov word [RIGHT], 1
+		mov word [UP],    0
+		mov word [DOWN],  0
+		mov word [LEFT],  0
+		mov word [RIGHT], 1
 
-__checkDown:
-	cmp ah, 0x50
-	jne __skip
+	__checkDown:
+		cmp ah, 0x50
+		jne __skip
 
-	cmp word [UP], 1
-	je __skip
+		cmp word [UP], 1
+		je __skip
 
-	mov word [UP],    0
-	mov word [DOWN],  1
-	mov word [LEFT],  0
-	mov word [RIGHT], 0
+		mov word [UP],    0
+		mov word [DOWN],  1
+		mov word [LEFT],  0
+		mov word [RIGHT], 0
 
-__skip:
+	__skip:
 	
-	pop ax
+		pop ax
 
-	pop bp
-	ret
-;----------------------------
+		pop bp
+		ret
+;////////////////////////////////////////////
 
+;////////////////////////////////////////////
 moveLeft:
 	push bp
 	mov bp, sp
@@ -567,24 +680,25 @@ moveLeft:
 	mov cx, [snakeSize]
 	dec cx
 
-_loopLeft:
-	mov ax, [bx + 2]
-	mov [bx], ax
+	_loopLeft:
+		mov ax, [bx + 2]
+		mov [bx], ax
 
-	add bx, 2
+		add bx, 2
 
-	dec cx
-	cmp cx, 0
-	jnz _loopLeft
+		dec cx
+		cmp cx, 0
+		jnz _loopLeft
 
-	pop cx
-	pop bx
-	pop ax
+		pop cx
+		pop bx
+		pop ax
 
-	pop bp
-	ret
-;----------------------------
+		pop bp
+		ret
+;////////////////////////////////////////////
 	
+;////////////////////////////////////////////
 fruitUpdate:
 	push bp
 	mov bp, sp
@@ -595,52 +709,52 @@ fruitUpdate:
 	push dx
 	push si
 
-__findFruitPos: 
+	__findFruitPos: 
 
-	push 10
-	call rand
+		push 10
+		call rand
 
-	cmp ax, 3
-	jne __nextComp
-
-	mov byte[poison], 1
-	mov byte[poison + 1], 0
-	jmp __upd
-
-	__nextComp:
-		cmp ax, 5
-		jne __nextComp1
+		cmp ax, 3
+		jne __nextComp
 
 		mov byte[poison], 1
 		mov byte[poison + 1], 0
 		jmp __upd
 
-	__nextComp1:
-		cmp ax, 8
-		jne __upd
+		__nextComp:
+			cmp ax, 5
+			jne __nextComp1
 
-		mov byte[poison], 1
-		mov byte[poison + 1], 0
-	
-	__upd:
-	mov dx, ax
-	shl dx, 1
-	mov byte[fruitType], dl
+			mov byte[poison], 1
+			mov byte[poison + 1], 0
+			jmp __upd
 
-	mov dx, [boundryX1Y1]
-	mov bx, [boundryX2Y2]
+		__nextComp1:
+			cmp ax, 8
+			jne __upd
 
-	mov cx, [fruitPos]
-	mov ax, cx
+			mov byte[poison], 1
+			mov byte[poison + 1], 0
 
-	mov cl, ch
-	mov ch, 0
-	mov ah, 0
+		__upd:
+			mov dx, ax
+			shl dx, 1
+			mov byte[fruitType], dl
 
-	push 0x0720
-	push cx
-	push ax
-	call drawPixel
+			mov dx, [boundryX1Y1]
+			mov bx, [boundryX2Y2]
+
+			mov cx, [fruitPos]
+			mov ax, cx
+
+			mov cl, ch
+			mov ch, 0
+			mov ah, 0
+
+			push 0x0720
+			push cx
+			push ax
+			call drawPixel
 
 	mov cx, 0
 	mov cl, bh
@@ -672,31 +786,31 @@ __findFruitPos:
 	mov si, 0
 	mov cx, [snakeSize]
 
-__checkFruit:
-	cmp word [snake + si], ax
-	je __findFruitPos
+	__checkFruit:
+		cmp word [snake + si], ax
+		je __findFruitPos
 
-	add si, 2
-	dec cx
-	cmp cx, 0
-	jnz __checkFruit
+		add si, 2
+		dec cx
+		cmp cx, 0
+		jnz __checkFruit
 
-	mov dx, ax
+		mov dx, ax
 
-	mov bx, 0
-	mov cx, 0
+		mov bx, 0
+		mov cx, 0
 
-	mov bl, ah
-	mov cl, al
+		mov bl, ah
+		mov cl, al
 
-	push bx
-	push cx
-	call getPixel
+		push bx
+		push cx
+		call getPixel
 
-	cmp ax, 3820
-	je __findFruitPos
+		cmp ax, 3820
+		je __findFruitPos
 
-	mov [fruitPos], dx
+		mov [fruitPos], dx
 
 	pop si 
 	pop dx 
@@ -706,9 +820,9 @@ __checkFruit:
 
 	pop bp
 	ret
+;////////////////////////////////////////////
 
-;----------------------------
-
+;////////////////////////////////////////////
 drawFruit:
 	push bp
 	mov bp, sp 
@@ -737,9 +851,9 @@ drawFruit:
 
 	pop bp
 	ret
+;////////////////////////////////////////////
 
-;----------------------------
-
+;////////////////////////////////////////////
 checkCollision:
 	push bp
 	mov bp, sp
@@ -781,85 +895,85 @@ checkCollision:
 	jmp __end
 
 	__nxtC:
-	cmp ah, ch
-	jae __nxtC1
+		cmp ah, ch
+		jae __nxtC1
 
-	dec byte[life]
-	call updateStat
+		dec byte[life]
+		call updateStat
 
-	mov byte[note_flag], 1
-	mov byte[note_flag + 1], 0
-	mov byte[note_flag + 2], 4
+		mov byte[note_flag], 1
+		mov byte[note_flag + 1], 0
+		mov byte[note_flag + 2], 4
 
-	push 9121	;middle C
-	call note
-	call resetGame
-	jmp __end
+		push 9121	;middle C
+		call note
+		call resetGame
+		jmp __end
 
 	__nxtC1:
-	mov cx, [boundryX2Y2]
-	dec cl
-	dec ch
+		mov cx, [boundryX2Y2]
+		dec cl
+		dec ch
 
-	cmp al, cl
-	jbe __nxtC2
+		cmp al, cl
+		jbe __nxtC2
 
-	dec byte[life]
-	call updateStat
+		dec byte[life]
+		call updateStat
 
-	mov byte[note_flag], 1
-	mov byte[note_flag + 1], 0
-	mov byte[note_flag + 2], 4
+		mov byte[note_flag], 1
+		mov byte[note_flag + 1], 0
+		mov byte[note_flag + 2], 4
 
-	push 9121	;middle C
-	call note
-	call resetGame
-	jmp __end
+		push 9121	;middle C
+		call note
+		call resetGame
+		jmp __end
 
 	__nxtC2:
-	cmp ah, ch
-	jbe __nxtC3
+		cmp ah, ch
+		jbe __nxtC3
 
-	dec byte[life]
-	call updateStat
+		dec byte[life]
+		call updateStat
 
-	mov byte[note_flag], 1
-	mov byte[note_flag + 1], 0
-	mov byte[note_flag + 2], 4
+		mov byte[note_flag], 1
+		mov byte[note_flag + 1], 0
+		mov byte[note_flag + 2], 4
 
-	push 9121	;middle C
-	call note
-	call resetGame
-	jmp __end
+		push 9121	;middle C
+		call note
+		call resetGame
+		jmp __end
 
 ; checking collision with snake's body
 	__nxtC3:
-	mov cx, [snakeSize]
-	mov bx, snake
-	dec cx
-	mov si, 0
+		mov cx, [snakeSize]
+		mov bx, snake
+		dec cx
+		mov si, 0
 
-__collision:
-	cmp ax, [bx + si]
-	jne __colS
+	__collision:
+		cmp ax, [bx + si]
+		jne __colS
 
-	dec byte[life]
-	call updateStat
+		dec byte[life]
+		call updateStat
 
-	mov byte[note_flag], 1
-	mov byte[note_flag + 1], 0
-	mov byte[note_flag + 2], 4
+		mov byte[note_flag], 1
+		mov byte[note_flag + 1], 0
+		mov byte[note_flag + 2], 4
 
-	push 9121	;middle C
-	call note
-	call resetGame
-	jmp __end
+		push 9121	;middle C
+		call note
+		call resetGame
+		jmp __end
 
 	__colS:
-	add si, 2
-	dec cx
-	cmp cx, 0
-	jnz __collision
+		add si, 2
+		dec cx
+		cmp cx, 0
+		jnz __collision
 
 
 	mov ax, [snakeSize]	
@@ -891,32 +1005,34 @@ __collision:
 	jmp __end
 
 	__skipC:
-	add word [interpolate], 4
+		add word [interpolate], 4
 
-	mov byte[note_flag], 1
-	mov byte[note_flag + 1], 0
-	mov byte[note_flag + 2], 6
+		mov byte[note_flag], 1
+		mov byte[note_flag + 1], 0
+		mov byte[note_flag + 2], 6
 
-	push 4560	;middle C
-	call note
-	call fruitUpdate
+		push 4560	;middle C
+		call note
+		call fruitUpdate
+		inc byte[cs:score]
+		call updateStat
 
-__end:
-	cmp byte[life], 0
-	je exit
+	__end:
+		cmp byte[life], 0
+		je exit
 
-	pop di
-	pop si
-	pop dx
-	pop cx
-	pop bx
-	pop ax
+		pop di
+		pop si
+		pop dx
+		pop cx
+		pop bx
+		pop ax
 
-	pop bp
-	ret
+		pop bp
+		ret
+;////////////////////////////////////////////
 
-;---------------------------
-
+;////////////////////////////////////////////
 interpolateSnake:
 	pusha
 
@@ -939,13 +1055,15 @@ interpolateSnake:
 	mov [bx + 2], ax
 	add word [snakeSize], 1
 	sub word [interpolate], 1
-__noInterp:
+	__noInterp:
 	
-	add word [interpInterval], 1
+		add word [interpInterval], 1
 
-	popa
-	ret
-;----------------------------
+		popa
+		ret
+;////////////////////////////////////////////
+
+;////////////////////////////////////////////
 ;	Game Functions
 
 resetGame:
@@ -963,67 +1081,66 @@ resetGame:
 	mov word [LEFT],  0
 	mov word [RIGHT], 1
 	
-l1:	
-	mov [bx], ax
-	inc al
+	l1:	
+		mov [bx], ax
+		inc al
 
-	add bx, 2
+		add bx, 2
 
-	dec cx
-	cmp cx, 0
-	jnz l1
-	
-	call clrscr
+		dec cx
+		cmp cx, 0
+		jnz l1
 
-	call drawBoundry
-	call fruitUpdate
+		call clrscr
 
-	call updateStat
-	call printStatTags
+		call drawBoundry
+		call fruitUpdate
 
-	call drawSnake
+		call updateStat
+		call printStatTags
+
+		call drawSnake
 	
 	popa
 	ret
+;////////////////////////////////////////////
 
-;----------------------------
-
+;////////////////////////////////////////////
 startSound:               ; idk what to name this lol
 	pusha
 
 	mov bx, 3
 
-__outerLoop:
-	mov byte[note_flag], 1
-	mov byte[note_flag + 1], 0
-	mov byte[note_flag + 2], 6
+	__outerLoop:
+		mov byte[note_flag], 1
+		mov byte[note_flag + 1], 0
+		mov byte[note_flag + 2], 6
 
-	push 1140	;middle C
-	call note
-	__innerLoop:
-		cmp byte[note_flag], 1
-		je __innerLoop
+		push 1140	;middle C
+		call note
+		__innerLoop:
+			cmp byte[note_flag], 1
+			je __innerLoop
 
-		push cx
-		push dx
+			push cx
+			push dx
 
-		mov ah, 0x86
-		mov cx, 2
-		mov dx, 0
-		int 0x15
+			mov ah, 0x86
+			mov cx, 2
+			mov dx, 0
+			int 0x15
 
-		pop dx
-		pop cx
+			pop dx
+			pop cx
 
-		dec bx
-		jnz __outerLoop
+			dec bx
+			jnz __outerLoop
 
 	popa
 	ret
+;////////////////////////////////////////////
 
-;----------------------------
-
-
+;////////////////////////////////////////////
 update:
 	push bp
 	mov bp, sp
@@ -1064,27 +1181,27 @@ update:
 
 	sub ah, 1
 
-__down:
-	cmp word [DOWN], 1
-	jne __left
+	__down:
+		cmp word [DOWN], 1
+		jne __left
 
-	add ah, 1
+		add ah, 1
 
-__left:
-	cmp word [LEFT], 1
-	jne __right
+	__left:
+		cmp word [LEFT], 1
+		jne __right
 
-	sub al, 1
+		sub al, 1
 
-__right:
-	cmp word [RIGHT], 1
-	jne __doNothing
+	__right:
+		cmp word [RIGHT], 1
+		jne __doNothing
 
-	add al, 1
+		add al, 1
 
-__doNothing:
-	
-	mov [bx], ax
+	__doNothing:
+
+		mov [bx], ax
 
 	pop si
 	pop dx
@@ -1094,8 +1211,9 @@ __doNothing:
 
 	pop bp
 	ret
+;////////////////////////////////////////////
 
-;----------------------------
+;////////////////////////////////////////////
 ;	Main Function
 
 main:
@@ -1110,34 +1228,39 @@ main:
 	call startSound
 
 
-infinite:
+	infinite:
 
-	call interpolateSnake
-	call update
-	call checkCollision
-	call drawFruit
-	call drawSnake
-	
+		call interpolateSnake
+		call update
+		call checkCollision
+		call drawFruit
+		call drawSnake
 
-	mov ah, 0x86
-	mov cx, 1
-	mov dx, 0xFFFF
-	int 0x15
 
-	jmp infinite
+		mov ah, 0x86
+		mov cx, 1
+		mov dx, 0xFFFF
+		int 0x15
 
-exit:
-	mov byte[note_flag], 1
-	mov byte[note_flag + 1], 0
-	mov byte[note_flag + 2], 4
+		jmp infinite
 
-	push 9121	;middle C
-	call note
+	exit:
+		mov byte[note_flag], 1
+		mov byte[note_flag + 1], 0
+		mov byte[note_flag + 2], 8
 
-	mov ax, 0x4c00
-	int 0x21
+		push 9121	;middle C
+		call note
 
-;----------------------------
+		deathloop:
+			cmp byte[note_flag], 0
+			jne deathloop
+
+		mov ax, 0x4c00
+		int 0x21
+;////////////////////////////////////////////
+
+;////////////////////////////////////////////
 ;	Defines	
 
 boundryX1Y1: 		dw 0x0400 ; H = Row, L = Column
@@ -1165,20 +1288,15 @@ RIGHT:				dw 0
 note_flag: times 3 	db 0
 
 life:				db 3
-str1: 				db 'Health:', 0
-str2:				db 'Time:', 0
+score:				db 0
+curr_time:			db 1, 0, 0
+end_msg1:			db 'GAME OVER', 0
+end_msg2:			db 'Your Score:', 0
 
 snakeSize:			dw 20
 maxSize:			dw 240
 snake:				times 240 dw 0 ; AH = Rows, AL = Columns
-
-
-
-
-
-
-
-
-
-
-
+str1: 				db 'Health:', 0
+str2:				db 'Time:', 0
+str3:				db 'Score:', 0
+;////////////////////////////////////////////
