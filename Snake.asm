@@ -852,6 +852,199 @@ drawFruit:
 	ret
 ;////////////////////////////////////////////
 
+genLevel1:
+	
+	pusha
+
+	mov ax, 0x0604
+	mov bx, level1
+	mov cx, [level1Size]
+	shr cx, 1
+
+	gen_loop1:
+
+		mov [bx], ax
+
+		add bx, 2
+		inc ax
+		dec cx
+		cmp cx, 0
+		jnz gen_loop1
+
+	mov ax, 0x1604
+	mov cx, [level1Size]
+	shr cx, 1
+
+	gen_loop2:
+
+		mov [bx], ax
+		add bx, 2
+		inc ax
+		dec cx
+		cmp cx, 0
+		jnz gen_loop2
+
+	popa
+	ret	
+;/////////////////////////////////////////////
+
+genLevel2:
+	
+	pusha
+
+	mov ax, 0x0804
+	mov bx, level2
+	mov cx, [level2Size]
+	shr cx, 1
+
+	gen_loop3:
+
+		mov [bx], ax
+
+		add bx, 2
+		inc ah
+		dec cx
+		cmp cx, 0
+		jnz gen_loop3
+
+	mov ax, 0x084B
+	mov cx, [level2Size]
+	shr cx, 1
+
+	gen_loop4:
+
+		mov [bx], ax
+		add bx, 2
+		inc ah
+		dec cx
+		cmp cx, 0
+		jnz gen_loop4
+
+	popa
+	ret	
+;/////////////////////////////////////////////
+
+genLevel3:
+	pusha
+
+	mov bx, level3
+	mov cx, [level1Size]
+	mov si, 0
+
+	gen_loop5:
+		mov ax, [level1 + si]
+		mov [bx], ax
+
+		add bx, 2
+		add si, 2
+		dec cx
+		cmp cx, 0
+		jnz gen_loop5
+
+
+	mov cx, [level2Size]
+	mov si, 0
+
+	gen_loop6:
+		mov ax, [level2 + si]
+		mov [bx], ax
+
+		add bx, 2
+		add si, 2
+		dec cx
+		cmp cx, 0
+		jnz gen_loop6
+
+
+	popa
+	ret
+
+
+
+drawLevel:
+	pusha
+
+	cmp word [currentLevel], 0
+	je d_level1
+
+	cmp word [currentLevel], 1
+	je d_level2
+
+		mov bx, level3
+		mov cx, [level3Size]
+
+		d_loop3:
+			mov ax, [bx]
+
+			mov dx, ax
+			mov dh, 0
+			mov al, ah
+			mov ah, 0
+
+			push 0x3820
+			push ax
+			push dx
+			call drawPixel
+
+			add bx, 2
+			dec cx
+			cmp cx, 0
+			jnz d_loop3
+		jmp d_end
+
+	d_level1:
+
+		mov bx, level1
+		mov cx, [level1Size]
+
+		d_loop1:
+			mov ax, [bx]
+
+			mov dx, ax
+			mov dh, 0
+			mov al, ah
+			mov ah, 0
+
+			push 0x3820
+			push ax
+			push dx
+			call drawPixel
+
+			add bx, 2
+			dec cx
+			cmp cx, 0
+			jnz d_loop1
+		jmp d_end
+
+	d_level2:
+
+		mov bx, level2
+		mov cx, [level2Size]
+
+		d_loop2:
+			mov ax, [bx]
+
+			mov dx, ax
+			mov dh, 0
+			mov al, ah
+			mov ah, 0
+
+			push 0x3820
+			push ax
+			push dx
+			call drawPixel
+
+			add bx, 2
+			dec cx
+			cmp cx, 0
+			jnz d_loop2
+		jmp d_end
+
+
+	d_end:
+	popa
+	ret
+
 ;////////////////////////////////////////////
 checkCollision:
 	push bp
@@ -865,6 +1058,15 @@ checkCollision:
 	push di
 
 ; checking collision with boundary
+
+	;////////////////////////////////
+	;	check collision with level walls
+
+
+
+
+
+
 
 	mov ax, [snakeSize]	
 	mov bx, snake
@@ -1093,6 +1295,7 @@ resetGame:
 		call clrscr
 
 		call drawBoundry
+		call drawLevel
 		call fruitUpdate
 
 		call updateStat
@@ -1261,16 +1464,20 @@ main:
 	mov ax, [es:0x1C * 0x4 + 0x2]
 	mov word[timerold + 2], ax
 
-	cli
 	mov word [es:0x1C * 0x4], clock
 	mov word [es:0x1C * 0x4 + 0x2], cs
-	sti
 
 	mov word [speed], 0x0001
 	mov word [speed +  2], 0xFFFE
 
+
+	call genLevel1
+	call genLevel2
+	call genLevel3
+
 	call resetGame
 	call startSound
+
 
 	infinite:
 
@@ -1279,8 +1486,6 @@ main:
 		call checkCollision
 		call drawFruit
 		call drawSnake
-
-
 		call speedControl
 
 		jmp infinite
@@ -1299,10 +1504,8 @@ main:
 		mov ax, [timerold]
 		mov bx, [timerold + 2]
 
-		cli
 		mov word [es:0x1C * 0x4], ax
 		mov word [es:0x1C * 0x4 + 0x2], bx
-		sti
 
 		mov ax, 0x4c00
 		int 0x21
@@ -1344,8 +1547,16 @@ end_msg2:			db 'Your Score:', 0
 
 snakeSize:			dw 20
 maxSize:			dw 240
-snake:				times 240 dw 0 ; AH = Rows, AL = Columns
+snake: times 240 	dw 0 ; AH = Rows, AL = Columns
 str1: 				db 'Health:', 0
 str2:				db 'Time:', 0
 str3:				db 'Score:', 0
+
+currentLevel:		dw 2
+level1:	times 144	dw 0			
+level1Size:			dw 144
+level2:	times 28	dw 0
+level2Size:			dw 28
+level3: times 172	dw 0
+level3Size:			dw 172
 ;////////////////////////////////////////////
