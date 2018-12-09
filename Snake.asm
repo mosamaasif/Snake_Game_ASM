@@ -314,6 +314,17 @@ printStatTags:
 		cmp byte[str3 + di], 0
 		jne __pl3
 
+	mov si, 600
+	mov di, 0
+	__pl4:
+		mov al, [str4 + di]
+		mov ah, 0x07
+		mov word[es:si], ax
+		add si, 2
+		inc di
+		cmp byte[str4 + di], 0
+		jne __pl4
+
 	pop es
 	popa
 	ret
@@ -353,6 +364,15 @@ updateStat:
 	push 2	;row
 	push 67	;col
 	mov al, [cs:score]
+	mov ah, 0
+	push ax
+	call printnum
+
+	mov ax, 0x0007
+	push ax
+	push 3	;row
+	push 67	;col
+	mov al, [cs:currlvl]
 	mov ah, 0
 	push ax
 	call printnum
@@ -1333,6 +1353,8 @@ interpolateSnake:
 	mov ax, [bx]
 	mov [bx + 2], ax
 	add word [snakeSize], 1
+	cmp word[snakeSize], 240
+	jae _noCheck1
 	sub word [interpolate], 1
 	__noInterp:
 	
@@ -1350,6 +1372,7 @@ resetGame:
 
 	mov word [snakeSize], 20
 	inc word [currentLevel]
+	inc byte[currlvl]
 
 	mov bx, snake
 	mov cx, [snakeSize]
@@ -1622,13 +1645,23 @@ update:
 		mov si, 1994
 		mov di, 0
 
+		jmp n
+		wonmsg:
+			mov di, end_msg3
+			jmp e_l1
+
+		n:
+			cmp word[snakeSize], 240
+			jae wonmsg
+
+		mov di, end_msg1
 		e_l1:
 			mov ah, 0x47
-			mov al, [end_msg1 + di]
+			mov al, [di]
 			mov word[es:si], ax
 			add si, 2
 			inc di
-			cmp byte[end_msg1 + di], 0
+			cmp byte[di], 0
 			jne e_l1
 
 		mov si, 2314
@@ -1822,9 +1855,12 @@ name: dw 342, 340, 338, 336, 496, 656, 816, 818, 820, 822, 982, 1142, 1302, 1300
 str1: 				db 'Health:', 0
 str2:				db 'Time:', 0
 str3:				db 'Score:', 0
+str4:				db 'Level:', 0
+currlvl:			db 0
 
 end_msg1:			db 'GAME OVER', 0
 end_msg2:			db 'Your Score:', 0
+end_msg3:           db 'YOU WON', 0
 
 curr: db 1
 m1:	  db 'START', 0
