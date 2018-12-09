@@ -5,7 +5,4 @@
 	TODO
 =========================================
 
-1: Add Time and Snake's Speed
-3: Display time and win/loose checks
-4: Add comments
-5: Stages/Levels (rest of the bonus is done)
+DOOONE!
