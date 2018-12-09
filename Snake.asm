@@ -803,22 +803,43 @@ fruitUpdate:
 		cmp cx, 0
 		jnz __checkFruit
 
-		mov dx, ax
+;////////////////////////////////////////////
+;	fruit level collision
 
-		mov bx, 0
-		mov cx, 0
+	cmp word [currentLevel], 0
+	jne __checkFruit2
 
-		mov bl, ah
-		mov cl, al
+		mov bx, level1
+		mov cx, [level1Size]
+		jmp __fruitLevelCollision
 
-		push bx
-		push cx
-		call getPixel
+	__checkFruit2:
+	cmp word [currentLevel], 1
+	jne __checkFruit3
 
-		cmp ax, 3820
-		je __findFruitPos
+		mov bx, level2
+		mov cx, [level2Size]
+		jmp __fruitLevelCollision
 
-		mov [fruitPos], dx
+	__checkFruit3:
+
+		mov bx, level3
+		mov cx, [level3Size]
+
+	__fruitLevelCollision:
+
+	mov si, 0
+
+		__checkFruitLevel:
+			cmp ax, [bx + si]
+			je __findFruitPos
+
+			add si, 2
+			dec cx
+			cmp cx, 0
+			jnz __checkFruitLevel
+
+		mov [fruitPos], ax
 
 	pop si 
 	pop dx 
@@ -1071,10 +1092,58 @@ checkCollision:
 	;////////////////////////////////
 	;	check collision with level walls
 
+	mov ax, [snakeSize]	
+	mov bx, snake
 
+	dec ax
+	shl ax, 1
+	add bx, ax
+	mov dx, [bx]
 
+	cmp word [currentLevel], 0
+	jne __checkLevel2
 
+		mov bx, level1
+		mov cx, [level1Size]
+		jmp __checkLevelCollision
 
+	__checkLevel2:
+	cmp word [currentLevel], 1
+	jne __checkLevel3
+
+		mov bx, level2
+		mov cx, [level2Size]
+		jmp __checkLevelCollision
+
+	__checkLevel3:
+
+		mov bx, level3
+		mov cx, [level3Size]
+
+	__checkLevelCollision:
+	mov si, 0
+
+	__levelCollision:
+		cmp dx, [bx + si]
+		jne __levelCol
+
+		dec byte[life]
+		call updateStat
+
+		mov byte[note_flag], 1
+		mov byte[note_flag + 1], 0
+		mov byte[note_flag + 2], 4
+
+		push 9121	;middle C
+		call note
+		call resetGame
+		jmp __end
+
+	__levelCol:
+		add si, 2
+		dec cx
+		cmp cx, 0
+		jnz __levelCollision
 
 
 	mov ax, [snakeSize]	
@@ -1307,7 +1376,6 @@ resetGame:
 		call drawBoundry
 		call drawLevel
 		call fruitUpdate
-
 		call updateStat
 		call printStatTags
 
@@ -1646,6 +1714,7 @@ main:
 	call genLevel3
 
 	call resetGame
+	call fruitUpdate
 	call startSound
 
 	infinite:
