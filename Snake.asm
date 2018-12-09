@@ -222,7 +222,7 @@ clock:
 			jb __endClock
 
 	call time_upd
-	cmp byte [life], 0
+	cmp word [life], 0
 	je __endClock
 	mov word [milliSecond], 0
 	add word [second], 1		
@@ -235,13 +235,12 @@ clock:
 
 	__endClock:
 		popa
-		cmp byte [life], 0
+		cmp word[life], 0
 		je __final
 		iret
 
 	__final:
 		pop ax
-		mov ax, exit
 		push exit
 		iret
 ;////////////////////////////////////////////
@@ -1257,8 +1256,15 @@ main:
 	push 0
 	pop es
 
+	mov ax, [es:0x1C * 0x4]
+	mov word[timerold], ax
+	mov ax, [es:0x1C * 0x4 + 0x2]
+	mov word[timerold + 2], ax
+
+	cli
 	mov word [es:0x1C * 0x4], clock
 	mov word [es:0x1C * 0x4 + 0x2], cs
+	sti
 
 	mov word [speed], 0x0001
 	mov word [speed +  2], 0xFFFE
@@ -1286,6 +1292,17 @@ main:
 
 		push 9121	;middle C
 		call note
+		deathloop:
+			cmp byte[note_flag], 1
+			je deathloop
+
+		mov ax, [timerold]
+		mov bx, [timerold + 2]
+
+		cli
+		mov word [es:0x1C * 0x4], ax
+		mov word [es:0x1C * 0x4 + 0x2], bx
+		sti
 
 		mov ax, 0x4c00
 		int 0x21
@@ -1306,7 +1323,7 @@ milliSecond: 		dw 0
 second: 			dw 0
 minute: 			dw 0
 
-
+timerold:			dd 0
 speed:				dd 0
 
 interpolate: 		dw 0
