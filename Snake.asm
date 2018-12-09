@@ -38,13 +38,13 @@ printnum:
 
 	mov ax, 0xb800
 	mov es, ax
-	mov ax, [bp + 4]	;number 
+	mov ax, [bp + 4]	;number
 	mov bx, 10 
 	mov cx, 0 
 
 	nextdigit:
 		mov dx, 0 
-		div bx 
+		div bx
 		add dl, 0x30 
 		push dx 
 		inc cx 
@@ -60,7 +60,8 @@ printnum:
 
 	nextpos:
 		pop dx
-		mov dh, 0x07 
+		mov ax, [bp + 10]
+		mov dh, al 
 		mov [es:di], dx 
 		add di, 2 
 		loop nextpos
@@ -72,7 +73,7 @@ printnum:
 	pop ax
 	pop es
 	pop bp
-	ret 6
+	ret 8
 ;////////////////////////////////////////////
 
 time_upd:
@@ -95,7 +96,9 @@ time_upd:
 		mov word[es:296], 0x073A
 		mov word[es:298], 0x0720
 		mov word[es:300], 0x0720
-	
+
+		mov ax, 0x0007
+		push ax
 		push 1
 		push 67
 		mov ah, 0
@@ -106,6 +109,8 @@ time_upd:
 		cmp word[curr_time + 1], 10
 		jb _tupd1
 		
+		mov ax, 0x0007
+		push ax
 		push 1
 		push 69
 		push word[curr_time + 1]
@@ -114,6 +119,8 @@ time_upd:
 
 		_tupd1:
 			mov word[es:298], 0x0730
+			mov ax, 0x0007
+			push ax
 			push 1
 			push 70
 			push word[curr_time + 1]
@@ -129,7 +136,7 @@ time_upd:
 		cmp word[curr_time + 1], 0
 		jne __tupd
 
-		mov byte[curr_time], 1
+		mov byte[curr_time], 4
 		mov word[curr_time + 1], 0
 		dec byte[life]
 		cmp byte[life], 0
@@ -341,6 +348,8 @@ updateStat:
 		add si, 2
 		loop __ul2
 
+	mov ax, 0x0007
+	push ax
 	push 2	;row
 	push 67	;col
 	mov al, [cs:score]
@@ -1271,6 +1280,7 @@ resetGame:
 	pusha
 
 	mov word [snakeSize], 20
+	inc word [currentLevel]
 
 	mov bx, snake
 	mov cx, [snakeSize]
@@ -1344,7 +1354,7 @@ speedControl:
 
 ;///////////////////////////////////////////
 
-startSound:               ; idk what to name this lol
+startSound:
 	pusha
 
 	mov bx, 3
@@ -1366,6 +1376,7 @@ startSound:               ; idk what to name this lol
 			mov ah, 0x86
 			mov cx, 2
 			mov dx, 0
+			mov al, 0
 			int 0x15
 
 			pop dx
@@ -1452,9 +1463,167 @@ update:
 ;////////////////////////////////////////////
 
 ;////////////////////////////////////////////
+	printName:
+		pusha
+
+        push 0xB800
+        pop es
+
+        mov cx, 83
+        mov si, name
+
+        p_l1:
+            mov bx, [si]
+            mov word[es:bx + 36], 0x4020
+            add si, 2
+            mov dx, 1000
+            __delay1:
+                mov ax, 100
+                __delay2:
+                    dec ax
+                    jnz __delay2
+                dec dx
+                jnz __delay1
+            dec cx
+            jnz p_l1
+        
+        popa
+        ret
+;////////////////////////////////////////////
+
+;////////////////////////////////////////////
+	menu:
+		pusha
+
+	    push 0xB800
+	    pop es
+
+	    cmp byte[curr], 1
+	    jne m_cmp2
+
+	    mov ah, 0x47
+	    jmp m_p1
+	    m_cmp2:
+	        mov ah, 0x47
+	        jmp m_p2
+
+	    m_p1:
+	    	mov si, 1994
+	    	mov di, 0
+			
+	    m_l1:
+	        mov al, [m1 + di]
+		    mov word[es:si], ax
+		    add si, 2
+		    inc di
+		    cmp byte[m1 + di], 0
+		    jne m_l1
+
+	    cmp byte[curr], 2
+	    je m_exit
+
+	    mov ah, 0x07
+	    m_p2:
+	    	mov si, 2314
+	   	 	mov di, 0
+	    m_l2:
+	        mov al, [m2 + di]
+		    mov word[es:si], ax
+		    add si, 2
+		    inc di
+		    cmp byte[m2 + di], 0
+		    jne m_l2
+
+	    mov ah, 0x07
+	    cmp byte[curr], 2
+	    je m_p1
+
+	    m_exit:
+	    	popa
+	    	ret
+;////////////////////////////////////////////
+
+;////////////////////////////////////////////
+	endDetails:
+		pusha
+		push es
+
+		push 0xB800
+		pop es
+
+		mov si, 1994
+		mov di, 0
+
+		e_l1:
+			mov ah, 0x47
+			mov al, [end_msg1 + di]
+			mov word[es:si], ax
+			add si, 2
+			inc di
+			cmp byte[end_msg1 + di], 0
+			jne e_l1
+
+		mov si, 2314
+		mov di, 0
+
+		e_l2:
+			mov ah, 0x07
+			mov al, [end_msg2 + di]
+			mov word[es:si], ax
+			add si, 2
+			inc di
+			cmp byte[end_msg2 + di], 0
+			jne e_l2
+
+		mov ax, 0x0004
+		push ax
+		push 14
+		push 50
+		mov ah, 0
+		mov al, [score]
+		push ax
+		call printnum
+
+		pop es
+		popa
+		ret
+;////////////////////////////////////////////
+
+;////////////////////////////////////////////
 ;	Main Function
 
 main:
+	
+	call clrscr
+	;call printName
+	start_loop:
+        call menu
+        mov ah, 0x00
+        int 0x16
+        cmp ah, 0x48    ;up
+
+        jne l_nextcmp
+        mov byte[curr], 1
+        jmp l_skip
+
+        l_nextcmp:
+            cmp ah, 0x50    ;down
+            jne l_nextcmp1
+
+        mov byte[curr], 2
+        jmp l_skip
+		
+       	l_nextcmp1:
+            cmp ah, 0x1C
+            jne l_skip
+
+        jmp l_next
+        l_skip:
+            jmp start_loop
+
+	l_next:
+		cmp byte[curr], 2
+		je quit
 	
 	push 0
 	pop es
@@ -1463,6 +1632,7 @@ main:
 	mov word[timerold], ax
 	mov ax, [es:0x1C * 0x4 + 0x2]
 	mov word[timerold + 2], ax
+	
 
 	mov word [es:0x1C * 0x4], clock
 	mov word [es:0x1C * 0x4 + 0x2], cs
@@ -1477,7 +1647,6 @@ main:
 
 	call resetGame
 	call startSound
-
 
 	infinite:
 
@@ -1504,9 +1673,15 @@ main:
 		mov ax, [timerold]
 		mov bx, [timerold + 2]
 
+		push 0
+		pop es
 		mov word [es:0x1C * 0x4], ax
 		mov word [es:0x1C * 0x4 + 0x2], bx
 
+		call clrscr
+		call endDetails
+
+	quit:
 		mov ax, 0x4c00
 		int 0x21
 ;////////////////////////////////////////////
@@ -1541,22 +1716,34 @@ note_flag: times 3 	db 0
 
 life:				db 3
 score:				db 0
-curr_time:			db 1, 0, 0
-end_msg1:			db 'GAME OVER', 0
-end_msg2:			db 'Your Score:', 0
+curr_time:			db 4, 0, 0
 
 snakeSize:			dw 20
 maxSize:			dw 240
 snake: times 240 	dw 0 ; AH = Rows, AL = Columns
-str1: 				db 'Health:', 0
-str2:				db 'Time:', 0
-str3:				db 'Score:', 0
 
-currentLevel:		dw 2
+currentLevel:		dw 0xFFFF
 level1:	times 144	dw 0			
 level1Size:			dw 144
 level2:	times 28	dw 0
 level2Size:			dw 28
 level3: times 172	dw 0
 level3Size:			dw 172
+
+name: dw 342, 340, 338, 336, 496, 656, 816, 818, 820, 822, 982, 1142, 1302, 1300, 1298, 1296, 
+      dw 346, 506, 666, 826, 986, 1146, 1306, 508, 670, 832, 994, 1156, 1318, 1158, 998, 838, 678, 518, 358, 
+      dw 362, 522, 682, 842, 1002, 1162, 1322, 364, 366, 368, 528, 688, 848, 1008, 1168, 1328, 844, 846, 848,
+      dw 372, 532, 692, 852, 1012, 1172, 1332, 694, 536, 378, 1014, 1176, 1338,
+      dw 382, 542, 702, 862, 1022, 1182, 1342, 384, 386, 388, 864, 866, 868, 1344, 1346, 1348
+
+str1: 				db 'Health:', 0
+str2:				db 'Time:', 0
+str3:				db 'Score:', 0
+
+end_msg1:			db 'GAME OVER', 0
+end_msg2:			db 'Your Score:', 0
+
+curr: db 1
+m1:	  db 'START', 0
+m2:   db 'QUIT', 0
 ;////////////////////////////////////////////
