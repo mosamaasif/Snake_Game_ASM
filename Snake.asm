@@ -1722,6 +1722,7 @@ main:
 		call interpolateSnake
 		call update
 		call checkCollision
+		call drawLevel
 		call drawFruit
 		call drawSnake
 		call speedControl
@@ -1735,9 +1736,22 @@ main:
 
 		push 9121	;middle C
 		call note
+
+		cmp byte [score], 0
+		jne _noCheck
+
+		in al, 61h
+		and al, 0xFC
+		out 61h, al
+_noCheck:
+
+		cmp byte [score], 0
+		je _noCheck1
+
 		deathloop:
 			cmp byte[note_flag], 1
 			je deathloop
+_noCheck1:
 
 		mov ax, [timerold]
 		mov bx, [timerold + 2]
