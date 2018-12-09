@@ -5,6 +5,5 @@
 	TODO
 =========================================
 
-1: Fix weird bug(Game stucks) after poisonous fruit disappear.
-2: Game's startup screen.
-3: Game's end screen. 
+DOOONE!
+
