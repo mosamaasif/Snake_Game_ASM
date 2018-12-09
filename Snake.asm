@@ -1373,6 +1373,7 @@ resetGame:
 	mov word [snakeSize], 20
 	inc word [currentLevel]
 	inc byte[currlvl]
+	mov word[poison], 0
 
 	mov bx, snake
 	mov cx, [snakeSize]
