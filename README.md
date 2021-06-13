@@ -89,8 +89,9 @@ To get a local copy up and running follow these simple steps.
    ```
 
 ### Output Images
-  <img src="images/main.gif">
+  <img src="images/main.png">
   <img src="images/game.gif">
+  <img src="images/g_over.png">
   
   
 <!-- LICENSE -->
